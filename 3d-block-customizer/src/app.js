@@ -14,7 +14,34 @@ class BlockCustomizer {
         this.selectedBlock = null;
         this.previewMesh = null;
         this.gltfLoader = new GLTFLoader();
+        this.currentDragBlockType = null;
+
+        // Define simple geometric shapes for testing
         this.customModels = [
+            { 
+                name: 'RedCube',
+                type: 'geometry',
+                geometry: 'cube',
+                color: 0xff0000,
+                scale: 1.0,
+                size: { width: 1, height: 1, depth: 1 }
+            },
+            { 
+                name: 'BlueSphere',
+                type: 'geometry',
+                geometry: 'sphere',
+                color: 0x0000ff,
+                scale: 1.0,
+                size: { radius: 0.5 }
+            },
+            { 
+                name: 'GreenCylinder',
+                type: 'geometry',
+                geometry: 'cylinder',
+                color: 0x00ff00,
+                scale: 1.0,
+                size: { radius: 0.5, height: 1 }
+            },
             { 
                 name: 'Box',
                 path: 'models/Box.glb',
@@ -69,13 +96,15 @@ class BlockCustomizer {
 
         // Create ground plane for raycasting
         const groundGeometry = new THREE.PlaneGeometry(100, 100);
-        const groundMaterial = new THREE.MeshBasicMaterial({ 
-            visible: false,
-            side: THREE.DoubleSide
+        const groundMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xcccccc,
+            transparent: true,
+            opacity: 0.0
         });
         this.groundPlane = new THREE.Mesh(groundGeometry, groundMaterial);
         this.groundPlane.rotation.x = -Math.PI / 2;
         this.groundPlane.position.y = 0;
+        this.groundPlane.userData.isGround = true; // Mark as ground for raycasting
         this.scene.add(this.groundPlane);
 
         this.createResetButton();
@@ -548,41 +577,82 @@ class BlockCustomizer {
             renderer.shadowMap.enabled = true;
             
             // Load and add model to preview scene
-            this.gltfLoader.load(model.path, (gltf) => {
-                const modelMesh = gltf.scene;
-                
-                // Apply model-specific transformations
-                modelMesh.scale.setScalar(model.scale * 0.3);
-                if (model.position) {
-                    modelMesh.position.set(
-                        model.position.x,
-                        model.position.y,
-                        model.position.z
-                    );
+            if (model.type === 'geometry') {
+                let geometry;
+                switch (model.geometry) {
+                    case 'cube':
+                        geometry = new THREE.BoxGeometry(
+                            model.size.width,
+                            model.size.height,
+                            model.size.depth
+                        );
+                        break;
+                    case 'sphere':
+                        geometry = new THREE.SphereGeometry(model.size.radius, 32, 32);
+                        break;
+                    case 'cylinder':
+                        geometry = new THREE.CylinderGeometry(
+                            model.size.radius,
+                            model.size.radius,
+                            model.size.height,
+                            32
+                        );
+                        break;
                 }
-                if (model.rotation) {
-                    modelMesh.rotation.set(
-                        model.rotation.x,
-                        model.rotation.y,
-                        model.rotation.z
-                    );
-                }
-                
-                // Center the model
-                const box = new THREE.Box3().setFromObject(modelMesh);
-                const center = box.getCenter(new THREE.Vector3());
-                modelMesh.position.sub(center);
-                
-                previewScene.add(modelMesh);
+
+                const material = new THREE.MeshStandardMaterial({
+                    color: model.color,
+                    metalness: 0.3,
+                    roughness: 0.4,
+                });
+
+                const mesh = new THREE.Mesh(geometry, material);
+                previewScene.add(mesh);
                 
                 // Setup animation
                 function animate() {
-                    modelMesh.rotation.y += 0.01;
+                    mesh.rotation.y += 0.01;
                     renderer.render(previewScene, previewCamera);
                     requestAnimationFrame(animate);
                 }
                 animate();
-            });
+            } else if (model.isGLB) {
+                this.gltfLoader.load(model.path, (gltf) => {
+                    const modelMesh = gltf.scene;
+                    
+                    // Apply model-specific transformations
+                    modelMesh.scale.setScalar(model.scale * 0.3);
+                    if (model.position) {
+                        modelMesh.position.set(
+                            model.position.x,
+                            model.position.y,
+                            model.position.z
+                        );
+                    }
+                    if (model.rotation) {
+                        modelMesh.rotation.set(
+                            model.rotation.x,
+                            model.rotation.y,
+                            model.rotation.z
+                        );
+                    }
+                    
+                    // Center the model
+                    const box = new THREE.Box3().setFromObject(modelMesh);
+                    const center = box.getCenter(new THREE.Vector3());
+                    modelMesh.position.sub(center);
+                    
+                    previewScene.add(modelMesh);
+                    
+                    // Setup animation
+                    function animate() {
+                        modelMesh.rotation.y += 0.01;
+                        renderer.render(previewScene, previewCamera);
+                        requestAnimationFrame(animate);
+                    }
+                    animate();
+                });
+            }
             
             modelElement.setAttribute('data-block-type', model.name);
             modelElement.draggable = true;
@@ -598,18 +668,54 @@ class BlockCustomizer {
         e.dataTransfer.setData('isGLB', blockType.isGLB || false);
         e.dataTransfer.setData('modelPath', blockType.path || '');
         e.dataTransfer.setData('modelScale', blockType.scale || 1.0);
+        e.dataTransfer.setData('geometryType', blockType.type || '');
+        
+        // Store the current blockType for use during drag
+        this.currentDragBlockType = blockType;
         
         if (this.previewMesh) {
             this.scene.remove(this.previewMesh);
         }
 
-        // Create appropriate preview mesh based on type
-        if (blockType.isGLB) {
+        // Create preview mesh
+        if (blockType.type === 'geometry') {
+            let geometry;
+            switch (blockType.geometry) {
+                case 'cube':
+                    geometry = new THREE.BoxGeometry(
+                        blockType.size.width,
+                        blockType.size.height,
+                        blockType.size.depth
+                    );
+                    break;
+                case 'sphere':
+                    geometry = new THREE.SphereGeometry(blockType.size.radius, 32, 32);
+                    break;
+                case 'cylinder':
+                    geometry = new THREE.CylinderGeometry(
+                        blockType.size.radius,
+                        blockType.size.radius,
+                        blockType.size.height,
+                        32
+                    );
+                    break;
+            }
+
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x00ff00,
+                transparent: true,
+                opacity: 0.5,
+                wireframe: true
+            });
+
+            this.previewMesh = new THREE.Mesh(geometry, material);
+            this.scene.add(this.previewMesh);
+        } else if (blockType.isGLB) {
+            // Existing GLB preview logic
             this.gltfLoader.load(blockType.path, (gltf) => {
                 const model = gltf.scene;
                 model.scale.setScalar(blockType.scale || 1.0);
                 
-                // Make the preview semi-transparent
                 model.traverse((node) => {
                     if (node.isMesh) {
                         node.material = new THREE.MeshBasicMaterial({
@@ -624,17 +730,6 @@ class BlockCustomizer {
                 this.previewMesh = model;
                 this.scene.add(this.previewMesh);
             });
-        } else {
-            // Basic shape preview
-            const geometry = new THREE.BoxGeometry(1, 1, 1);
-            const material = new THREE.MeshBasicMaterial({
-                color: 0x00ff00,
-                transparent: true,
-                opacity: 0.5,
-                wireframe: true
-            });
-            this.previewMesh = new THREE.Mesh(geometry, material);
-            this.scene.add(this.previewMesh);
         }
     }
 
@@ -649,34 +744,55 @@ class BlockCustomizer {
         
         this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
         
-        const intersectObjects = this.scene.children.filter(obj => obj !== this.previewMesh);
-        const intersects = this.raycaster.intersectObjects(intersectObjects, true);
+        const validTargets = this.scene.children.filter(obj => 
+            obj !== this.previewMesh && (obj.userData.isGround || obj.userData.isInteractive)
+        );
+        
+        const intersects = this.raycaster.intersectObjects(validTargets, true);
         
         if (intersects.length > 0) {
             const intersectPoint = intersects[0].point;
+            const intersectedObj = intersects[0].object;
             
-            // Get the bounding box of the preview mesh
-            const previewBox = new THREE.Box3().setFromObject(this.previewMesh);
-            const previewHeight = previewBox.max.y - previewBox.min.y;
-            
-            // If intersecting with an object (not the floor), place on top
-            if (intersects[0].object.userData.isInteractive) {
-                const targetBox = new THREE.Box3().setFromObject(intersects[0].object);
-                const position = new THREE.Vector3(
+            let position;
+            if (intersectedObj.userData.isInteractive) {
+                // Place on top of other objects
+                const targetBox = new THREE.Box3().setFromObject(intersectedObj);
+                position = new THREE.Vector3(
                     intersectPoint.x,
-                    targetBox.max.y + previewHeight * 0.5,
+                    targetBox.max.y,
                     intersectPoint.z
                 );
-                this.previewMesh.position.copy(position);
-            } else {
-                // Place on the floor with minimum height
-                const position = new THREE.Vector3(
+            } else if (intersectedObj.userData.isGround) {
+                // Get height offset based on geometry type
+                let heightOffset = 0;
+                if (this.currentDragBlockType.type === 'geometry') {
+                    switch (this.currentDragBlockType.geometry) {
+                        case 'cube':
+                            heightOffset = this.currentDragBlockType.size.height / 2;
+                            break;
+                        case 'sphere':
+                            heightOffset = this.currentDragBlockType.size.radius;
+                            break;
+                        case 'cylinder':
+                            heightOffset = this.currentDragBlockType.size.height / 2;
+                            break;
+                    }
+                }
+                
+                position = new THREE.Vector3(
                     intersectPoint.x,
-                    0,  // Place object so its center is at half its height
+                    heightOffset, // Place at correct height based on object type
                     intersectPoint.z
                 );
-                this.previewMesh.position.copy(position);
             }
+            
+            if (position) {
+                this.previewMesh.position.copy(position);
+                this.previewMesh.visible = true;
+            }
+        } else {
+            this.previewMesh.visible = false;
         }
     }
 
@@ -689,9 +805,12 @@ class BlockCustomizer {
     handleDrop(e) {
         e.preventDefault();
         
+        if (!this.previewMesh || !this.previewMesh.visible) return; // Only allow drops on valid surfaces
+        
         const blockType = e.dataTransfer.getData('blockType');
         const modelPath = e.dataTransfer.getData('modelPath');
         const modelScale = parseFloat(e.dataTransfer.getData('modelScale')) || 1.0;
+        const geometryType = e.dataTransfer.getData('geometryType');
         
         const rect = this.renderer.domElement.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -699,29 +818,34 @@ class BlockCustomizer {
         
         this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
         
-        const intersectObjects = this.scene.children.filter(obj => obj !== this.previewMesh);
-        const intersects = this.raycaster.intersectObjects(intersectObjects, true);
+        // Only raycast against the ground plane and interactive objects
+        const validTargets = this.scene.children.filter(obj => 
+            obj !== this.previewMesh && (obj.userData.isGround || obj.userData.isInteractive)
+        );
+        
+        const intersects = this.raycaster.intersectObjects(validTargets, true);
         
         if (intersects.length > 0) {
             const intersectPoint = intersects[0].point;
+            const intersectedObj = intersects[0].object;
             
             // Find the original model data
             const modelData = this.customModels.find(m => m.name === blockType);
             
             let position;
-            if (intersects[0].object.userData.isInteractive) {
-                // If intersecting with another object, place on top
-                const targetBox = new THREE.Box3().setFromObject(intersects[0].object);
+            if (intersectedObj.userData.isInteractive) {
+                // Place on top of other objects
+                const targetBox = new THREE.Box3().setFromObject(intersectedObj);
                 position = new THREE.Vector3(
                     intersectPoint.x,
-                    targetBox.max.y,  // Place directly on top
+                    targetBox.max.y,
                     intersectPoint.z
                 );
-            } else {
-                // Place on the floor
+            } else if (intersectedObj.userData.isGround) {
+                // Place directly on the ground
                 position = new THREE.Vector3(
                     intersectPoint.x,
-                    0,  // Place directly on the floor
+                    0,
                     intersectPoint.z
                 );
             }
@@ -741,6 +865,11 @@ class BlockCustomizer {
                     this.previewMesh = null;
                 }
                 
+                this.currentDragBlockType = null;
+                
+                // Mark the block as interactive for future stacking
+                block.userData.isInteractive = true;
+                
                 this.scene.add(block);
                 this.addedObjects.push(block);
                 
@@ -753,71 +882,92 @@ class BlockCustomizer {
     }
 
     createBlock(blockType, position) {
-        if (blockType.isGLB) {
-            return new Promise((resolve) => {
+        return new Promise((resolve) => {
+            if (blockType.type === 'geometry') {
+                // Create basic geometric shape
+                let geometry;
+                let heightOffset = 0;
+                
+                switch (blockType.geometry) {
+                    case 'cube':
+                        geometry = new THREE.BoxGeometry(
+                            blockType.size.width,
+                            blockType.size.height,
+                            blockType.size.depth
+                        );
+                        heightOffset = blockType.size.height / 2;
+                        break;
+                    case 'sphere':
+                        geometry = new THREE.SphereGeometry(blockType.size.radius, 32, 32);
+                        heightOffset = blockType.size.radius;
+                        break;
+                    case 'cylinder':
+                        geometry = new THREE.CylinderGeometry(
+                            blockType.size.radius,
+                            blockType.size.radius,
+                            blockType.size.height,
+                            32
+                        );
+                        heightOffset = blockType.size.height / 2;
+                        break;
+                }
+
+                const material = new THREE.MeshStandardMaterial({
+                    color: blockType.color,
+                    metalness: 0.3,
+                    roughness: 0.4,
+                });
+
+                const mesh = new THREE.Mesh(geometry, material);
+                
+                // Adjust position based on geometry type
+                const adjustedPosition = position.clone();
+                if (position.y === 0) {
+                    // If placing on ground, add height offset
+                    adjustedPosition.y = heightOffset;
+                } else {
+                    // If stacking, add height offset to the target position
+                    adjustedPosition.y += heightOffset;
+                }
+                
+                mesh.position.copy(adjustedPosition);
+                mesh.userData.isInteractive = true;
+                mesh.userData.type = blockType.geometry;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                resolve(mesh);
+            } else if (blockType.isGLB) {
+                // Existing GLB loading logic
                 this.gltfLoader.load(blockType.path, (gltf) => {
                     const model = gltf.scene;
+                    model.scale.setScalar(blockType.scale);
                     
-                    // Scale the model
-                    const scale = blockType.scale || 1.0;
-                    model.scale.setScalar(scale);
-                    
-                    // Calculate bounding box before positioning
+                    // Calculate the height offset for GLB models
                     const box = new THREE.Box3().setFromObject(model);
-                    const height = box.max.y - box.min.y;
-                    const offset = box.min.y; // Get the bottom offset of the model
+                    const heightOffset = (box.max.y - box.min.y) / 2;
                     
-                    // Adjust position to place bottom of model at target position
+                    // Adjust position based on model height
                     const adjustedPosition = position.clone();
                     if (position.y === 0) {
-                        // If placing on floor, adjust to compensate for model's bottom offset
-                        adjustedPosition.y = -offset * scale;
+                        adjustedPosition.y = heightOffset;
                     } else {
-                        // If stacking, keep the target height but adjust for bottom offset
-                        adjustedPosition.y -= offset * scale;
+                        adjustedPosition.y += heightOffset;
                     }
-                    model.position.copy(adjustedPosition);
                     
-                    // Add shadows and make objects interactive
+                    model.position.copy(adjustedPosition);
+                    model.userData.isInteractive = true;
                     model.traverse((node) => {
                         if (node.isMesh) {
                             node.castShadow = true;
                             node.receiveShadow = true;
-                            node.userData.isInteractive = true;
                         }
                     });
-
+                    
                     resolve(model);
                 });
-            });
-        } else {
-            // Handle basic shapes (should not be called for GLB models)
-            const geometry = new THREE.BoxGeometry(1, 1, 1);
-            const material = new THREE.MeshStandardMaterial({ 
-                color: blockType.color || 0x00ff00,
-                roughness: 0.7,
-                metalness: 0.3
-            });
-            
-            const mesh = new THREE.Mesh(geometry, material);
-            
-            // For box, adjust position to place bottom at target position
-            const adjustedPosition = position.clone();
-            if (position.y === 0) {
-                // Place box directly on floor by offsetting half its height
-                adjustedPosition.y = 0;  // Half of box height
-            } else {
-                // When stacking, place on top of the target object
-                adjustedPosition.y += 0.5;  // Add half height to align bottom with target
             }
-            mesh.position.copy(adjustedPosition);
-            
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            mesh.userData.isInteractive = true;
-
-            return Promise.resolve(mesh);
-        }
+        });
     }
 
     animate() {
