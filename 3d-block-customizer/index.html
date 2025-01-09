@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Block Customizer</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <script async src="https://unpkg.com/es-module-shims/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/",
+            "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="app-container">
+        <div id="sidebar">
+            <h2>Block Library</h2>
+            <div id="block-palette"></div>
+        </div>
+        <div id="canvas-container"></div>
+        <div id="controls">
+            <button id="undo-btn">Undo</button>
+            <button id="redo-btn">Redo</button>
+            <button id="reset-btn">Reset View</button>
+        </div>
+    </div>
+    <script type="module" src="src/app.js"></script>
+</body>
+</html>
