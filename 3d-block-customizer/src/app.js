@@ -265,7 +265,23 @@ class BlockCustomizer {
                         itemElement.style.boxShadow = 'none';
                     });
 
-                    itemElement.addEventListener('dragstart', (e) => this.dragDropManager.handleDragStart(e, item));
+                    itemElement.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.effectAllowed = 'move';
+                        this.dragDropManager.handleDragStart(e, item);
+                    });
+
+                    itemElement.addEventListener('dragend', (e) => {
+                        e.preventDefault();
+                        if (this.dragDropManager.isDragging) {
+                            this.dragDropManager.isDragging = false;
+                            this.dragDropManager.rotationIndicator.style.display = 'none';
+                            if (this.dragDropManager.objectManager.previewMesh) {
+                                this.dragDropManager.sceneManager.removeObject(this.dragDropManager.objectManager.previewMesh);
+                                this.dragDropManager.objectManager.previewMesh = null;
+                            }
+                        }
+                    });
+
                     itemsGrid.appendChild(itemElement);
                 });
 
@@ -347,9 +363,30 @@ class BlockCustomizer {
 
     setupEventListeners() {
         const canvasContainer = document.getElementById('canvas-container');
-        canvasContainer.addEventListener('dragover', (e) => this.dragDropManager.handleDragOver(e));
-        canvasContainer.addEventListener('dragleave', (e) => this.dragDropManager.handleDragLeave(e));
-        canvasContainer.addEventListener('drop', (e) => this.dragDropManager.handleDrop(e));
+        
+        // Prevent default drag behaviors
+        canvasContainer.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        
+        canvasContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.dragDropManager.handleDragOver(e);
+        });
+        
+        canvasContainer.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.dragDropManager.handleDragLeave(e);
+        });
+        
+        canvasContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.dragDropManager.handleDrop(e);
+        });
 
         document.getElementById('undo-btn').addEventListener('click', () => this.undo());
         document.getElementById('redo-btn').addEventListener('click', () => this.redo());

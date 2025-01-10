@@ -2,174 +2,163 @@ import * as THREE from 'three';
 
 export class DragDropManager {
     constructor(sceneManager, objectManager) {
+        console.log('DragDropManager initialized');
         this.sceneManager = sceneManager;
         this.objectManager = objectManager;
         this.raycaster = new THREE.Raycaster();
         this.currentDragBlockType = null;
         this.lastIntersectedObject = null;
-    }
+        this.currentRotation = 0;
+        this.isDragging = false;
+        this.mousePosition = new THREE.Vector2();
+        
+        // Create rotation indicator
+        this.rotationIndicator = document.createElement('div');
+        this.rotationIndicator.style.cssText = `
+            position: fixed;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            pointer-events: none;
+            display: none;
+            z-index: 1000;
+        `;
+        document.body.appendChild(this.rotationIndicator);
 
-    handleDragStart(e, blockType) {
-        e.dataTransfer.setData('blockType', blockType.name);
-        this.currentDragBlockType = blockType;
+        // Track mouse position for rotation indicator
+        window.addEventListener('mousemove', (e) => {
+            this.mousePosition.x = e.clientX;
+            this.mousePosition.y = e.clientY;
+            if (this.isDragging) {
+                this.updateRotationIndicator(e);
+            }
+        });
 
-        // Create and show preview
-        this.objectManager.createPreview(blockType).then(preview => {
-            if (preview) {
-                this.sceneManager.addObject(preview);
+        // Handle clicks for object selection
+        this.sceneManager.renderer.domElement.addEventListener('click', (e) => {
+            if (!this.isDragging) {
+                const intersect = this.getIntersectedObject(e);
+                if (intersect && intersect.object.userData.isInteractive) {
+                    this.objectManager.selectObject(intersect.object);
+                    this.updateRotationIndicator(e);
+                } else {
+                    this.objectManager.deselectObject();
+                    this.rotationIndicator.style.display = 'none';
+                }
+            }
+        });
+
+        // Global keydown handler
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (this.isDragging && this.objectManager.previewMesh) {
+                    console.log('Space pressed during drag, rotating preview');
+                    this.rotateObject(this.objectManager.previewMesh);
+                } else if (!this.isDragging) {
+                    console.log('Space pressed, rotating selected object');
+                    if (this.objectManager.rotateSelectedObject()) {
+                        this.updateRotationIndicator({ 
+                            clientX: this.mousePosition.x, 
+                            clientY: this.mousePosition.y 
+                        });
+                    }
+                }
             }
         });
     }
 
-    handleDragOver(e) {
-        e.preventDefault();
-        if (!this.currentDragBlockType || !this.objectManager.previewMesh) return;
-
-        const intersectionInfo = this.getIntersectionPoint(e);
-        if (intersectionInfo) {
-            const { point, object: intersectedObject } = intersectionInfo;
-            let finalPosition = point.clone();
-
-            // If intersecting with an object (not ground), align and stack
-            if (intersectedObject && intersectedObject.userData.isInteractive) {
-                const targetBox = new THREE.Box3().setFromObject(intersectedObject);
-                const previewBox = new THREE.Box3().setFromObject(this.objectManager.previewMesh);
-                
-                // Calculate center position of target object
-                const targetCenter = new THREE.Vector3();
-                targetBox.getCenter(targetCenter);
-                
-                // Set position to be centered on target object and at the correct height
-                finalPosition.x = targetCenter.x;
-                finalPosition.z = targetCenter.z;
-                finalPosition.y = targetBox.max.y;
-
-                // Update last intersected object
-                this.lastIntersectedObject = intersectedObject;
-            } else {
-                // If not intersecting with an object, clear last intersected
-                this.lastIntersectedObject = null;
-                
-                // Snap to grid when placing on ground
-                finalPosition.x = Math.round(finalPosition.x);
-                finalPosition.z = Math.round(finalPosition.z);
-            }
-
-            // Update preview position
-            this.objectManager.previewMesh.position.copy(finalPosition);
-        }
-    }
-
-    handleDrop(e) {
-        e.preventDefault();
-        if (!this.currentDragBlockType) return;
-
-        const intersectionInfo = this.getIntersectionPoint(e);
-        if (intersectionInfo) {
-            const { point, object: intersectedObject } = intersectionInfo;
-            let finalPosition = point.clone();
-            let canPlace = true;
-
-            // If dropping on an object, check for collisions with other objects
-            if (intersectedObject && intersectedObject.userData.isInteractive) {
-                const targetBox = new THREE.Box3().setFromObject(intersectedObject);
-                const targetCenter = new THREE.Vector3();
-                targetBox.getCenter(targetCenter);
-                
-                finalPosition.x = targetCenter.x;
-                finalPosition.z = targetCenter.z;
-                finalPosition.y = targetBox.max.y;
-
-                // Create a temporary object to check collisions
-                this.objectManager.createObject(this.currentDragBlockType, finalPosition)
-                    .then(tempObject => {
-                        // Check collisions with all other objects
-                        for (const existingObject of this.objectManager.objects) {
-                            if (existingObject !== intersectedObject && 
-                                this.objectManager.checkCollision(tempObject, existingObject)) {
-                                canPlace = false;
-                                break;
-                            }
-                        }
-
-                        if (canPlace) {
-                            // Remove preview
-                            if (this.objectManager.previewMesh) {
-                                this.sceneManager.removeObject(this.objectManager.previewMesh);
-                                this.objectManager.removePreview();
-                            }
-
-                            // Add the new object
-                            this.sceneManager.addObject(tempObject);
-                            this.objectManager.addObject(tempObject);
-                            this.objectManager.selectObject(tempObject);
-
-                            // Establish parent-child relationship
-                            tempObject.userData.parent = intersectedObject;
-                            if (!intersectedObject.userData.children) {
-                                intersectedObject.userData.children = [];
-                            }
-                            intersectedObject.userData.children.push(tempObject);
-                        } else {
-                            // If can't place, remove the temporary object
-                            this.sceneManager.removeObject(tempObject);
-                        }
-                    });
-            } else {
-                // Placing on ground
-                finalPosition.x = Math.round(finalPosition.x);
-                finalPosition.z = Math.round(finalPosition.z);
-
-                this.objectManager.createObject(this.currentDragBlockType, finalPosition)
-                    .then(object => {
-                        // Check collisions with existing objects
-                        for (const existingObject of this.objectManager.objects) {
-                            if (this.objectManager.checkCollision(object, existingObject)) {
-                                canPlace = false;
-                                break;
-                            }
-                        }
-
-                        if (canPlace) {
-                            // Remove preview
-                            if (this.objectManager.previewMesh) {
-                                this.sceneManager.removeObject(this.objectManager.previewMesh);
-                                this.objectManager.removePreview();
-                            }
-
-                            // Add the new object
-                            this.sceneManager.addObject(object);
-                            this.objectManager.addObject(object);
-                            this.objectManager.selectObject(object);
-                        } else {
-                            // If can't place, remove the object
-                            this.sceneManager.removeObject(object);
-                        }
-                    });
-            }
-        }
-
-        this.currentDragBlockType = null;
-        this.lastIntersectedObject = null;
-    }
-
-    handleDragLeave(e) {
-        e.preventDefault();
-        if (this.objectManager.previewMesh) {
-            this.sceneManager.removeObject(this.objectManager.previewMesh);
-            this.objectManager.removePreview();
-        }
-        this.lastIntersectedObject = null;
-    }
-
-    getIntersectionPoint(e) {
+    getIntersectedObject(e) {
         const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
         this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.sceneManager.camera);
         
-        // Get all valid targets for intersection, excluding the preview mesh
+        const intersects = this.raycaster.intersectObjects(this.objectManager.objects, true);
+        if (intersects.length > 0) {
+            let obj = intersects[0].object;
+            while (obj.parent && !obj.userData.isInteractive) {
+                obj = obj.parent;
+            }
+            return { point: intersects[0].point, object: obj };
+        }
+        return null;
+    }
+
+    updateRotationIndicator(e) {
+        if (this.isDragging && this.objectManager.previewMesh) {
+            this.rotationIndicator.style.display = 'block';
+            this.rotationIndicator.style.left = (e.clientX + 20) + 'px';
+            this.rotationIndicator.style.top = (e.clientY + 20) + 'px';
+            this.rotationIndicator.textContent = `Rotation: ${this.currentRotation}° (Press SPACE to rotate)`;
+        } else if (!this.isDragging && this.objectManager.selectedObject) {
+            this.rotationIndicator.style.display = 'block';
+            this.rotationIndicator.style.left = (e.clientX + 20) + 'px';
+            this.rotationIndicator.style.top = (e.clientY + 20) + 'px';
+            const rotation = Math.round(this.objectManager.selectedObject.rotation.y * (180/Math.PI));
+            this.rotationIndicator.textContent = `Selected Object Rotation: ${rotation}° (Press SPACE to rotate)`;
+        } else {
+            this.rotationIndicator.style.display = 'none';
+        }
+    }
+
+    rotateObject(object) {
+        if (!object) {
+            console.log('No object to rotate');
+            return;
+        }
+        console.log('Rotating object');
+        this.currentRotation = (this.currentRotation + 90) % 360;
+        object.rotation.y = THREE.MathUtils.degToRad(this.currentRotation);
+        console.log('New rotation:', this.currentRotation);
+        this.updateRotationIndicator({ clientX: this.mousePosition.x, clientY: this.mousePosition.y });
+    }
+
+    handleDragStart(e, blockType) {
+        console.log('Drag started', blockType);
+        e.dataTransfer.setData('blockType', blockType.name);
+        e.dataTransfer.effectAllowed = 'move';
+        this.currentDragBlockType = blockType;
+        this.isDragging = true;
+        this.currentRotation = 0;
+        console.log('Set isDragging to true');
+        
+        // Create preview immediately
+        this.objectManager.createPreview(blockType).then(preview => {
+            console.log('Preview created:', preview, 'isDragging:', this.isDragging);
+            if (preview) {
+                this.sceneManager.addObject(preview);
+                this.updateRotationIndicator(e);
+            }
+        });
+    }
+
+    handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        if (!this.isDragging) {
+            console.log('DragOver but isDragging is false');
+            return;
+        }
+        
+        if (!this.currentDragBlockType || !this.objectManager.previewMesh) {
+            console.log('DragOver but no blockType or previewMesh');
+            return;
+        }
+
+        console.log('DragOver - isDragging:', this.isDragging);
+
+        const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.sceneManager.camera);
+        
         const validTargets = [
             this.sceneManager.groundPlane,
             ...this.objectManager.objects.filter(obj => obj !== this.objectManager.previewMesh)
@@ -178,18 +167,120 @@ export class DragDropManager {
         const intersects = this.raycaster.intersectObjects(validTargets, true);
         
         if (intersects.length > 0) {
-            // Find the actual object that was intersected (might be a child mesh)
+            const intersectionPoint = intersects[0].point;
             let intersectedObject = intersects[0].object;
+            
             while (intersectedObject.parent && !intersectedObject.userData.isInteractive) {
                 intersectedObject = intersectedObject.parent;
             }
 
-            return {
-                point: intersects[0].point,
-                object: intersectedObject
-            };
+            let finalPosition = intersectionPoint.clone();
+
+            if (intersectedObject && intersectedObject.userData.isInteractive) {
+                const bbox = new THREE.Box3().setFromObject(intersectedObject);
+                const center = bbox.getCenter(new THREE.Vector3());
+                finalPosition.x = center.x;
+                finalPosition.z = center.z;
+                finalPosition.y = bbox.max.y;
+                this.lastIntersectedObject = intersectedObject;
+            } else {
+                this.lastIntersectedObject = null;
+                finalPosition.x = Math.round(finalPosition.x);
+                finalPosition.z = Math.round(finalPosition.z);
+                finalPosition.y = 0;  // Reset Y to ground level for non-object intersections
+            }
+
+            this.objectManager.previewMesh.position.copy(finalPosition);
         }
 
-        return null;
+        this.updateRotationIndicator(e);
+    }
+
+    handleDragLeave(e) {
+        console.log('Drag leave, was dragging:', this.isDragging);
+        e.preventDefault();
+        if (this.objectManager.previewMesh) {
+            this.sceneManager.removeObject(this.objectManager.previewMesh);
+            this.objectManager.previewMesh = null;
+        }
+        this.lastIntersectedObject = null;
+        this.isDragging = false;
+        this.rotationIndicator.style.display = 'none';
+    }
+
+    handleDrop(e) {
+        console.log('Drop event, was dragging:', this.isDragging);
+        e.preventDefault();
+        if (!this.currentDragBlockType) {
+            console.log('No current drag block type');
+            return;
+        }
+
+        const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.sceneManager.camera);
+        
+        const validTargets = [
+            this.sceneManager.groundPlane,
+            ...this.objectManager.objects.filter(obj => obj !== this.objectManager.previewMesh)
+        ];
+
+        const intersects = this.raycaster.intersectObjects(validTargets, true);
+        
+        if (intersects.length > 0) {
+            console.log('Drop intersection:', intersects[0]);
+            const intersectionPoint = intersects[0].point;
+            let intersectedObject = intersects[0].object;
+            
+            while (intersectedObject.parent && !intersectedObject.userData.isInteractive) {
+                intersectedObject = intersectedObject.parent;
+            }
+
+            let finalPosition = intersectionPoint.clone();
+
+            if (intersectedObject && intersectedObject.userData.isInteractive) {
+                const bbox = new THREE.Box3().setFromObject(intersectedObject);
+                const center = bbox.getCenter(new THREE.Vector3());
+                finalPosition.x = center.x;
+                finalPosition.z = center.z;
+                finalPosition.y = bbox.max.y;
+            } else {
+                finalPosition.x = Math.round(finalPosition.x);
+                finalPosition.z = Math.round(finalPosition.z);
+                finalPosition.y = 0;  // Reset Y to ground level for non-object intersections
+            }
+
+            this.objectManager.createObject(this.currentDragBlockType, finalPosition).then(object => {
+                console.log('Object created:', object);
+                if (object) {
+                    // Apply current rotation
+                    object.rotation.y = THREE.MathUtils.degToRad(this.currentRotation);
+
+                    if (this.objectManager.previewMesh) {
+                        this.sceneManager.removeObject(this.objectManager.previewMesh);
+                        this.objectManager.previewMesh = null;
+                    }
+
+                    this.sceneManager.addObject(object);
+                    this.objectManager.objects.push(object);
+
+                    if (intersectedObject && intersectedObject.userData.isInteractive) {
+                        object.userData.parent = intersectedObject;
+                        if (!intersectedObject.userData.children) {
+                            intersectedObject.userData.children = [];
+                        }
+                        intersectedObject.userData.children.push(object);
+                    }
+                }
+            });
+        }
+
+        this.currentDragBlockType = null;
+        this.lastIntersectedObject = null;
+        this.isDragging = false;
+        this.currentRotation = 0;
+        this.rotationIndicator.style.display = 'none';
     }
 }

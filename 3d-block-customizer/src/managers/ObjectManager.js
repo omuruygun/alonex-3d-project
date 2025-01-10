@@ -5,15 +5,15 @@ export class ObjectManager {
     constructor() {
         this.objects = [];
         this.gltfLoader = new GLTFLoader();
-        this.selectedObject = null;
         this.previewMesh = null;
+        this.selectedObject = null;
+        this.objectRotation = 0;
     }
 
     createObject(blockType, position) {
         return new Promise((resolve) => {
             if (blockType.type === 'geometry') {
                 const mesh = this.createGeometryObject(blockType);
-                // Adjust position to account for object height
                 const height = this.getObjectHeight(mesh);
                 position.y += height / 2;
                 mesh.position.copy(position);
@@ -32,7 +32,7 @@ export class ObjectManager {
     createGeometryObject(blockType) {
         const geometry = this.createGeometry(blockType);
         const material = new THREE.MeshStandardMaterial({
-            color: blockType.color,
+            color: blockType.color || 0xcccccc,
             metalness: 0.3,
             roughness: 0.4,
         });
@@ -40,7 +40,7 @@ export class ObjectManager {
         const mesh = new THREE.Mesh(geometry, material);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
-        mesh.userData.type = blockType.geometry;
+        mesh.userData.type = 'geometry';
         mesh.userData.isInteractive = true;
 
         return mesh;
@@ -71,72 +71,38 @@ export class ObjectManager {
     createGLBObject(blockType, position) {
         return new Promise((resolve) => {
             this.gltfLoader.load(blockType.path, (gltf) => {
-                const model = gltf.scene;
-                
-                // Create a container for the model
                 const container = new THREE.Group();
+                container.userData.type = 'glb';
+                container.userData.isInteractive = true;
+
+                const model = gltf.scene;
+                model.scale.setScalar(blockType.scale || 1);
                 
-                // Reset model rotation and position
-                model.rotation.set(0, 0, 0);
+                // Reset position and rotation
                 model.position.set(0, 0, 0);
-                model.updateMatrix();
+                model.rotation.set(0, 0, 0);
                 
+                // Add model to container
                 container.add(model);
                 
-                // Apply scale first
-                model.scale.setScalar(blockType.scale);
-                
-                // Calculate the accurate bounding box after scaling
-                const bbox = new THREE.Box3();
-                bbox.setFromObject(model);
-                
-                // Get actual dimensions
+                // Calculate bounding box
+                const bbox = new THREE.Box3().setFromObject(model);
                 const dimensions = new THREE.Vector3();
                 bbox.getSize(dimensions);
                 
-                // Create a collision box (slightly smaller than the actual model)
-                const collisionGeometry = new THREE.BoxGeometry(
-                    dimensions.x * 0.95,
-                    dimensions.y * 0.95,
-                    dimensions.z * 0.95
-                );
-                const collisionMaterial = new THREE.MeshBasicMaterial({
-                    visible: false
-                });
-                const collisionMesh = new THREE.Mesh(collisionGeometry, collisionMaterial);
-                collisionMesh.userData.isCollider = true;
-                container.add(collisionMesh);
-                
-                // Position the model within the container
+                // Center model in container
                 const center = bbox.getCenter(new THREE.Vector3());
                 model.position.sub(center);
-                model.position.y = -dimensions.y / 2; // Align bottom with container bottom
-                collisionMesh.position.copy(model.position);
-                collisionMesh.position.y = -dimensions.y / 2;
+                model.position.y = -dimensions.y / 2;
                 
-                // Adjust container position
-                if (position.y === 0) {
-                    // If placing on ground, set Y to half the height
-                    position.y = dimensions.y / 2;
-                } else {
-                    // If stacking, add half the height to the target position
-                    position.y += dimensions.y / 2;
-                }
-                
-                // Snap position to grid
-                position.x = Math.round(position.x);
-                position.z = Math.round(position.z);
-                container.position.copy(position);
-                
-                // Apply default front-facing rotation
-                if (!blockType.rotation) {
-                    model.rotation.y = Math.PI;
-                } else {
-                    model.rotation.set(
-                        THREE.MathUtils.degToRad(blockType.rotation.x || 0),
-                        THREE.MathUtils.degToRad(blockType.rotation.y || 0),
-                        THREE.MathUtils.degToRad(blockType.rotation.z || 0)
-                    );
+                // Set container position
+                if (position) {
+                    if (position.y === 0) {
+                        position.y = dimensions.y / 2;
+                    } else {
+                        position.y += dimensions.y / 2;
+                    }
+                    container.position.copy(position);
                 }
                 
                 // Set up shadows and materials
@@ -151,24 +117,9 @@ export class ObjectManager {
                     }
                 });
 
-                // Store dimensions and metadata
-                container.userData = {
-                    type: 'glb',
-                    isInteractive: true,
-                    model: model,
-                    dimensions: dimensions,
-                    collider: collisionMesh
-                };
-
                 resolve(container);
             });
         });
-    }
-
-    checkCollision(object1, object2) {
-        const box1 = new THREE.Box3().setFromObject(object1.userData.collider || object1);
-        const box2 = new THREE.Box3().setFromObject(object2.userData.collider || object2);
-        return box1.intersectsBox(box2);
     }
 
     createPreview(blockType) {
@@ -182,59 +133,18 @@ export class ObjectManager {
 
             if (blockType.type === 'geometry') {
                 const geometry = this.createGeometry(blockType);
-                this.previewMesh = new THREE.Mesh(geometry, previewMaterial);
-                resolve(this.previewMesh);
+                const mesh = new THREE.Mesh(geometry, previewMaterial);
+                mesh.userData.type = 'geometry';
+                mesh.userData.isInteractive = true;
+                this.previewMesh = mesh;
+                resolve(mesh);
             } else if (blockType.isGLB) {
-                this.gltfLoader.load(blockType.path, (gltf) => {
-                    const model = gltf.scene.clone();
-                    
-                    // Reset model rotation and position
-                    model.rotation.set(0, 0, 0);
-                    model.position.set(0, 0, 0);
-                    model.updateMatrix();
-                    
-                    // Create a container for the preview
-                    const container = new THREE.Group();
-                    container.add(model);
-                    
-                    // Calculate bounding box and center the model
-                    const bbox = new THREE.Box3().setFromObject(model);
-                    const modelHeight = bbox.max.y - bbox.min.y;
-                    const center = bbox.getCenter(new THREE.Vector3());
-                    model.position.sub(center);
-                    
-                    // Apply scale
-                    model.scale.setScalar(blockType.scale);
-                    
-                    // Apply default front-facing rotation (if not specified in blockType)
-                    if (!blockType.rotation) {
-                        model.rotation.y = Math.PI; // Rotate 180 degrees to face front
-                    } else {
-                        model.rotation.set(
-                            THREE.MathUtils.degToRad(blockType.rotation.x || 0),
-                            THREE.MathUtils.degToRad(blockType.rotation.y || 0),
-                            THREE.MathUtils.degToRad(blockType.rotation.z || 0)
-                        );
-                    }
-                    
-                    // Create a bounding box helper for better visibility
-                    const scaledBbox = new THREE.Box3().setFromObject(model);
-                    const boxHelper = new THREE.Box3Helper(scaledBbox, 0x00ff00);
-                    boxHelper.material.transparent = true;
-                    boxHelper.material.opacity = 0.3;
-                    container.add(boxHelper);
-                    
-                    // Apply preview materials
-                    model.traverse((node) => {
+                this.createGLBObject(blockType).then(container => {
+                    container.traverse((node) => {
                         if (node.isMesh) {
-                            node.userData.originalMaterial = node.material;
-                            const meshPreviewMaterial = previewMaterial.clone();
-                            meshPreviewMaterial.color.set(0x00ff00);
-                            meshPreviewMaterial.opacity = 0.3;
-                            node.material = meshPreviewMaterial;
+                            node.material = previewMaterial.clone();
                         }
                     });
-
                     this.previewMesh = container;
                     resolve(container);
                 });
@@ -242,18 +152,49 @@ export class ObjectManager {
         });
     }
 
-    removePreview() {
-        if (this.previewMesh) {
-            // Restore original materials if it's a GLB model
-            if (this.previewMesh.userData.type === 'glb') {
-                this.previewMesh.userData.model.traverse((node) => {
-                    if (node.isMesh && node.userData.originalMaterial) {
-                        node.material = node.userData.originalMaterial;
-                    }
-                });
-            }
-            this.previewMesh = null;
+    selectObject(object) {
+        // Deselect previous object if any
+        if (this.selectedObject) {
+            this.deselectObject();
         }
+
+        // Select new object
+        this.selectedObject = object;
+        if (object) {
+            console.log('Object selected:', object);
+            // Store current rotation
+            this.objectRotation = (Math.round(object.rotation.y * (180/Math.PI)) + 360) % 360;
+            // Add selection visual feedback
+            object.traverse((node) => {
+                if (node.isMesh && node.material) {
+                    node.material.emissive = new THREE.Color(0x555555);
+                }
+            });
+        }
+    }
+
+    deselectObject() {
+        if (this.selectedObject) {
+            console.log('Object deselected');
+            // Remove selection visual feedback
+            this.selectedObject.traverse((node) => {
+                if (node.isMesh && node.material) {
+                    node.material.emissive = new THREE.Color(0x000000);
+                }
+            });
+            this.selectedObject = null;
+            this.objectRotation = 0;
+        }
+    }
+
+    rotateSelectedObject() {
+        if (this.selectedObject) {
+            console.log('Rotating selected object');
+            this.objectRotation = (this.objectRotation + 90) % 360;
+            this.selectedObject.rotation.y = THREE.MathUtils.degToRad(this.objectRotation);
+            return true;
+        }
+        return false;
     }
 
     addObject(object) {
@@ -265,33 +206,14 @@ export class ObjectManager {
         if (index > -1) {
             this.objects.splice(index, 1);
         }
+        if (object === this.selectedObject) {
+            this.deselectObject();
+        }
     }
 
-    selectObject(object) {
-        if (this.selectedObject) {
-            if (this.selectedObject.userData.model) {
-                this.selectedObject.userData.model.traverse((node) => {
-                    if (node.isMesh && node.material) {
-                        node.material.emissive.setHex(0x000000);
-                    }
-                });
-            } else if (this.selectedObject.material) {
-                this.selectedObject.material.emissive.setHex(0x000000);
-            }
-        }
-        
-        this.selectedObject = object;
-        
-        if (object) {
-            if (object.userData.model) {
-                object.userData.model.traverse((node) => {
-                    if (node.isMesh && node.material) {
-                        node.material.emissive.setHex(0x333333);
-                    }
-                });
-            } else if (object.material) {
-                object.material.emissive.setHex(0x333333);
-            }
-        }
+    checkCollision(object1, object2) {
+        const box1 = new THREE.Box3().setFromObject(object1);
+        const box2 = new THREE.Box3().setFromObject(object2);
+        return box1.intersectsBox(box2);
     }
 }
