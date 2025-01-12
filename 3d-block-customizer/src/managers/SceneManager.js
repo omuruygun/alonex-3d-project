@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomManager } from './RoomManager.js';
 
 export class SceneManager {
     constructor(container) {
@@ -13,9 +12,6 @@ export class SceneManager {
         this.setupLights();
         this.setupGround();
         this.setupControls();
-        
-        // Create room
-        this.roomManager = new RoomManager(this.scene);
         
         window.addEventListener('resize', this.onWindowResize.bind(this));
     }
@@ -78,11 +74,40 @@ export class SceneManager {
     }
 
     setupGround() {
+        // Create ground plane with grid
         const groundGeometry = new THREE.PlaneGeometry(100, 100);
+        
+        // Create canvas for the text
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 2048;  // Higher resolution
+        canvas.height = 2048;
+        
+        // Set background
+        context.fillStyle = '#333333';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add text
+        context.font = 'bold 80px Arial';
+        context.fillStyle = '#FFFF00';  // Same yellow as grid
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        
+        // Add multiple instances of text for tiling effect
+        for(let y = canvas.height/4; y < canvas.height; y += canvas.height/2) {
+            for(let x = canvas.width/4; x < canvas.width; x += canvas.width/2) {
+                context.fillText('ALONEX MOBİLYA', x, y);
+            }
+        }
+        
+        // Create texture from canvas
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(1, 1);
+        
         const groundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0xcccccc,
-            transparent: true,
-            opacity: 0.0,
+            map: texture,
             side: THREE.DoubleSide
         });
         
@@ -92,7 +117,19 @@ export class SceneManager {
         this.groundPlane.receiveShadow = true;
         this.groundPlane.userData.isGround = true;
         
+        // Add grid helper
+        const size = 100;
+        const divisions = 100;
+        const gridHelper = new THREE.GridHelper(size, divisions, 0xFFFF00, 0xFFFF00);
+        gridHelper.position.y = 0.01; // Slightly above ground to prevent z-fighting
+        gridHelper.material.opacity = 0.2;
+        gridHelper.material.transparent = true;
+        
         this.scene.add(this.groundPlane);
+        this.scene.add(gridHelper);
+        
+        // Store grid size for snapping calculations
+        this.gridSize = size / divisions;
     }
 
     onWindowResize() {
