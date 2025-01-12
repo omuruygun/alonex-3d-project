@@ -177,20 +177,57 @@ export class DragDropManager {
             let finalPosition = intersectionPoint.clone();
 
             if (intersectedObject && intersectedObject.userData.isInteractive) {
-                const bbox = new THREE.Box3().setFromObject(intersectedObject);
-                const center = bbox.getCenter(new THREE.Vector3());
-                finalPosition.x = center.x;
-                finalPosition.z = center.z;
-                finalPosition.y = bbox.max.y;
+                const existingBBox = new THREE.Box3().setFromObject(intersectedObject);
+                const previewBBox = new THREE.Box3().setFromObject(this.objectManager.previewMesh);
+                
+                // If we're near the top, stack
+                if (intersectionPoint.y > existingBBox.max.y - 0.2) {
+                    const center = existingBBox.getCenter(new THREE.Vector3());
+                    finalPosition.x = center.x;
+                    finalPosition.z = center.z;
+                    finalPosition.y = existingBBox.max.y;
+                } else {
+                    // Place beside based on closest edge
+                    const center = existingBBox.getCenter(new THREE.Vector3());
+                    const toPoint = new THREE.Vector2(
+                        intersectionPoint.x - center.x,
+                        intersectionPoint.z - center.z
+                    );
+                    
+                    // Determine the closest edge using bounding box dimensions
+                    const angle = Math.atan2(toPoint.y, toPoint.x);
+                    const PI4 = Math.PI / 4;
+                    
+                    if (angle > -PI4 && angle <= PI4) {
+                        // Right side
+                        finalPosition.x = existingBBox.max.x + (previewBBox.max.x - previewBBox.min.x) / 2;
+                        finalPosition.z = center.z;
+                    } else if (angle > PI4 && angle <= 3 * PI4) {
+                        // Front side
+                        finalPosition.x = center.x;
+                        finalPosition.z = existingBBox.max.z + (previewBBox.max.z - previewBBox.min.z) / 2;
+                    } else if (angle > -3 * PI4 && angle <= -PI4) {
+                        // Back side
+                        finalPosition.x = center.x;
+                        finalPosition.z = existingBBox.min.z - (previewBBox.max.z - previewBBox.min.z) / 2;
+                    } else {
+                        // Left side
+                        finalPosition.x = existingBBox.min.x - (previewBBox.max.x - previewBBox.min.x) / 2;
+                        finalPosition.z = center.z;
+                    }
+                    finalPosition.y = 0;
+                }
                 this.lastIntersectedObject = intersectedObject;
             } else {
                 this.lastIntersectedObject = null;
-                finalPosition.x = Math.round(finalPosition.x);
-                finalPosition.z = Math.round(finalPosition.z);
-                finalPosition.y = 0;  // Reset Y to ground level for non-object intersections
+                finalPosition.x = this.snapToGrid(finalPosition.x);
+                finalPosition.z = this.snapToGrid(finalPosition.z);
+                finalPosition.y = 0;
             }
 
-            this.objectManager.previewMesh.position.copy(finalPosition);
+            if (this.objectManager.previewMesh) {
+                this.objectManager.previewMesh.position.copy(finalPosition);
+            }
         }
 
         this.updateRotationIndicator(e);
@@ -241,14 +278,51 @@ export class DragDropManager {
             let finalPosition = intersectionPoint.clone();
 
             if (intersectedObject && intersectedObject.userData.isInteractive) {
-                const bbox = new THREE.Box3().setFromObject(intersectedObject);
-                const center = bbox.getCenter(new THREE.Vector3());
-                finalPosition.x = center.x;
-                finalPosition.z = center.z;
-                finalPosition.y = bbox.max.y;
+                const existingBBox = new THREE.Box3().setFromObject(intersectedObject);
+                const previewBBox = new THREE.Box3().setFromObject(this.objectManager.previewMesh);
+                
+                // If we're near the top, stack
+                if (intersectionPoint.y > existingBBox.max.y - 0.2) {
+                    const center = existingBBox.getCenter(new THREE.Vector3());
+                    finalPosition.x = center.x;
+                    finalPosition.z = center.z;
+                    finalPosition.y = existingBBox.max.y;
+                } else {
+                    // Place beside based on closest edge
+                    const center = existingBBox.getCenter(new THREE.Vector3());
+                    const toPoint = new THREE.Vector2(
+                        intersectionPoint.x - center.x,
+                        intersectionPoint.z - center.z
+                    );
+                    
+                    // Determine the closest edge using bounding box dimensions
+                    const angle = Math.atan2(toPoint.y, toPoint.x);
+                    const PI4 = Math.PI / 4;
+                    
+                    if (angle > -PI4 && angle <= PI4) {
+                        // Right side
+                        finalPosition.x = existingBBox.max.x + (previewBBox.max.x - previewBBox.min.x) / 2;
+                        finalPosition.z = center.z;
+                    } else if (angle > PI4 && angle <= 3 * PI4) {
+                        // Front side
+                        finalPosition.x = center.x;
+                        finalPosition.z = existingBBox.max.z + (previewBBox.max.z - previewBBox.min.z) / 2;
+                    } else if (angle > -3 * PI4 && angle <= -PI4) {
+                        // Back side
+                        finalPosition.x = center.x;
+                        finalPosition.z = existingBBox.min.z - (previewBBox.max.z - previewBBox.min.z) / 2;
+                    } else {
+                        // Left side
+                        finalPosition.x = existingBBox.min.x - (previewBBox.max.x - previewBBox.min.x) / 2;
+                        finalPosition.z = center.z;
+                    }
+                    finalPosition.y = 0;
+                }
+                
+                this.lastIntersectedObject = intersectedObject;
             } else {
-                finalPosition.x = Math.round(finalPosition.x);
-                finalPosition.z = Math.round(finalPosition.z);
+                finalPosition.x = this.snapToGrid(finalPosition.x);
+                finalPosition.z = this.snapToGrid(finalPosition.z);
                 finalPosition.y = 0;  // Reset Y to ground level for non-object intersections
             }
 
@@ -282,5 +356,10 @@ export class DragDropManager {
         this.isDragging = false;
         this.currentRotation = 0;
         this.rotationIndicator.style.display = 'none';
+    }
+
+    snapToGrid(value) {
+        const gridSize = this.sceneManager.gridSize;
+        return Math.round(value / gridSize) * gridSize;
     }
 }

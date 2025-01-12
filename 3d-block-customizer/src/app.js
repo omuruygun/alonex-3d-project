@@ -8,42 +8,42 @@ class BlockCustomizer {
         this.productCategories = {
             'Living Room': {
                 'TV Units': [
-                    { name: 'Modern TV Unit', path: 'models/table.glb', isGLB: true, scale: 1 },
-                    { name: 'Classic TV Unit', path: 'models/Duck.glb', isGLB: true, scale: 1 }
+                    { name: 'Modern TV Unit', path: 'models/1.glb', isGLB: true, scale: 1 },
+                    { name: 'Classic TV Unit', path: 'models/2.glb', isGLB: true, scale: 1 }
                 ],
                 'Sofas': [
-                    { name: 'L-Shaped Sofa', path: 'models/Box.glb', isGLB: true, scale: 1 },
-                    { name: '3-Seater Sofa', path: 'models/sofa-3.glb', isGLB: true, scale: 1 }
+                    { name: 'L-Shaped Sofa', path: 'models/3.glb', isGLB: true, scale: 1 },
+                    { name: '3-Seater Sofa', path: 'models/4.glb', isGLB: true, scale: 1 }
                 ]
             },
             'Bedroom': {
                 'Beds': [
-                    { name: 'Double Bed', path: 'models/bed.glb', isGLB: true, scale: 1 },
-                    { name: 'Single Bed', path: 'models/single-bed.glb', isGLB: true, scale: 1 }
+                    { name: 'Double Bed', path: 'models/5.glb', isGLB: true, scale: 1 },
+                    { name: 'Single Bed', path: 'models/6.glb', isGLB: true, scale: 1 }
                 ],
                 'Wardrobes': [
-                    { name: 'Sliding Wardrobe', path: 'models/wardrobe-sliding.glb', isGLB: true, scale: 1 },
-                    { name: '2-Door Wardrobe', path: 'models/wardrobe-2door.glb', isGLB: true, scale: 1 }
+                    { name: 'Sliding Wardrobe', path: 'models/7.glb', isGLB: true, scale: 1 },
+                    { name: '2-Door Wardrobe', path: 'models/8.glb', isGLB: true, scale: 1 }
                 ]
             },
             'Dining': {
                 'Tables': [
-                    { name: 'Dining Table', path: 'models/table.glb', isGLB: true, scale: 1 },
-                    { name: 'Coffee Table', path: 'models/coffee-table.glb', isGLB: true, scale: 1 }
+                    { name: 'Dining Table', path: 'models/9.glb', isGLB: true, scale: 1 },
+                    { name: 'Coffee Table', path: 'models/10.glb', isGLB: true, scale: 1 }
                 ],
                 'Chairs': [
-                    { name: 'Dining Chair', path: 'models/chair.glb', isGLB: true, scale: 1 },
-                    { name: 'Bar Stool', path: 'models/bar-stool.glb', isGLB: true, scale: 1 }
+                    { name: 'Dining Chair', path: 'models/11.glb', isGLB: true, scale: 1 },
+                    { name: 'Bar Stool', path: 'models/12.glb', isGLB: true, scale: 1 }
                 ]
             },
             'Utility': {
                 'Storage': [
-                    { name: 'Bookshelf', path: 'models/bookshelf.glb', isGLB: true, scale: 1 },
-                    { name: 'Cabinet', path: 'models/cabinet.glb', isGLB: true, scale: 1 }
+                    { name: 'Bookshelf', path: 'models/13.glb', isGLB: true, scale: 1 },
+                    { name: 'Cabinet', path: 'models/14.glb', isGLB: true, scale: 1 }
                 ],
                 'Decor': [
-                    { name: 'Table Lamp', path: 'models/lamp.glb', isGLB: true, scale: 1 },
-                    { name: 'Plant Pot', path: 'models/plant.glb', isGLB: true, scale: 1 }
+                    { name: 'Table Lamp', path: 'models/15.glb', isGLB: true, scale: 1 },
+                    { name: 'Plant Pot', path: 'models/16.glb', isGLB: true, scale: 1 }
                 ]
             }
         };

@@ -76,46 +76,66 @@ export class ObjectManager {
                 container.userData.isInteractive = true;
 
                 const model = gltf.scene;
+                
+                // Apply initial scale
                 model.scale.setScalar(blockType.scale || 1);
                 
-                // Reset position and rotation
-                model.position.set(0, 0, 0);
-                model.rotation.set(0, 0, 0);
+                // Update world matrix to ensure correct positions
+                model.updateWorldMatrix(true, true);
                 
-                // Add model to container
-                container.add(model);
+                // Create a new group for the processed model
+                const processedGroup = new THREE.Group();
                 
-                // Calculate bounding box
-                const bbox = new THREE.Box3().setFromObject(model);
-                const dimensions = new THREE.Vector3();
-                bbox.getSize(dimensions);
-                
-                // Center model in container
-                const center = bbox.getCenter(new THREE.Vector3());
-                model.position.sub(center);
-                model.position.y = -dimensions.y / 2;
-                
-                // Set container position
-                if (position) {
-                    if (position.y === 0) {
-                        position.y = dimensions.y / 2;
-                    } else {
-                        position.y += dimensions.y / 2;
-                    }
-                    container.position.copy(position);
-                }
-                
-                // Set up shadows and materials
+                // Process all meshes
                 model.traverse((node) => {
                     if (node.isMesh) {
-                        node.castShadow = true;
-                        node.receiveShadow = true;
-                        if (node.material) {
-                            node.material.metalness = 0.3;
-                            node.material.roughness = 0.4;
+                        // Clone the mesh to preserve materials
+                        const clonedMesh = node.clone();
+                        
+                        // Get world position and apply it
+                        const worldPos = new THREE.Vector3();
+                        node.getWorldPosition(worldPos);
+                        clonedMesh.position.copy(worldPos);
+                        
+                        // Get world quaternion and apply it
+                        const worldQuat = new THREE.Quaternion();
+                        node.getWorldQuaternion(worldQuat);
+                        clonedMesh.quaternion.copy(worldQuat);
+                        
+                        // Get world scale and apply it
+                        const worldScale = new THREE.Vector3();
+                        node.getWorldScale(worldScale);
+                        clonedMesh.scale.copy(worldScale);
+                        
+                        // Setup shadows
+                        clonedMesh.castShadow = true;
+                        clonedMesh.receiveShadow = true;
+                        
+                        // Adjust material properties
+                        if (clonedMesh.material) {
+                            clonedMesh.material = clonedMesh.material.clone();
+                            clonedMesh.material.metalness = 0.1;
+                            clonedMesh.material.roughness = 0.8;
                         }
+                        
+                        processedGroup.add(clonedMesh);
                     }
                 });
+                
+                // Calculate bounding box
+                const bbox = new THREE.Box3().setFromObject(processedGroup);
+                const center = bbox.getCenter(new THREE.Vector3());
+                
+                // Center the processed group
+                processedGroup.position.set(-center.x, -bbox.min.y, -center.z);
+                
+                // Add to container
+                container.add(processedGroup);
+                
+                // Position container if specified
+                if (position) {
+                    container.position.copy(position);
+                }
 
                 resolve(container);
             });
@@ -123,32 +143,22 @@ export class ObjectManager {
     }
 
     createPreview(blockType) {
-        return new Promise((resolve) => {
-            const previewMaterial = new THREE.MeshBasicMaterial({
-                color: 0x00ff00,
-                transparent: true,
-                opacity: 0.5,
-                side: THREE.DoubleSide
-            });
-
-            if (blockType.type === 'geometry') {
-                const geometry = this.createGeometry(blockType);
-                const mesh = new THREE.Mesh(geometry, previewMaterial);
-                mesh.userData.type = 'geometry';
-                mesh.userData.isInteractive = true;
-                this.previewMesh = mesh;
-                resolve(mesh);
-            } else if (blockType.isGLB) {
-                this.createGLBObject(blockType).then(container => {
-                    container.traverse((node) => {
-                        if (node.isMesh) {
-                            node.material = previewMaterial.clone();
-                        }
-                    });
-                    this.previewMesh = container;
-                    resolve(container);
-                });
+        return this.createGLBObject(blockType, new THREE.Vector3(0, 0, 0)).then(preview => {
+            if (this.previewMesh) {
+                this.removePreview();
             }
+            
+            preview.traverse((child) => {
+                if (child.isMesh) {
+                    const material = child.material.clone();
+                    material.transparent = true;
+                    material.opacity = 0.5;
+                    child.material = material;
+                }
+            });
+            
+            this.previewMesh = preview;
+            return preview;
         });
     }
 
