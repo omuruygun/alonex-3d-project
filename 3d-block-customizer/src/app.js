@@ -4,49 +4,25 @@ import { DragDropManager } from './managers/DragDropManager.js';
 
 class BlockCustomizer {
     constructor() {
-        // Remove the old customModels array and replace with categorized furniture
-        this.productCategories = {
-            'Living Room': {
-                'TV Units': [
-                    { name: 'Modern TV Unit', path: 'models/1.glb', isGLB: true, scale: 1 },
-                    { name: 'Classic TV Unit', path: 'models/2.glb', isGLB: true, scale: 1 }
-                ],
-                'Sofas': [
-                    { name: 'L-Shaped Sofa', path: 'models/3.glb', isGLB: true, scale: 1 },
-                    { name: '3-Seater Sofa', path: 'models/4.glb', isGLB: true, scale: 1 }
-                ]
-            },
-            'Bedroom': {
-                'Beds': [
-                    { name: 'Double Bed', path: 'models/5.glb', isGLB: true, scale: 1 },
-                    { name: 'Single Bed', path: 'models/6.glb', isGLB: true, scale: 1 }
-                ],
-                'Wardrobes': [
-                    { name: 'Sliding Wardrobe', path: 'models/7.glb', isGLB: true, scale: 1 },
-                    { name: '2-Door Wardrobe', path: 'models/8.glb', isGLB: true, scale: 1 }
-                ]
-            },
-            'Dining': {
-                'Tables': [
-                    { name: 'Dining Table', path: 'models/9.glb', isGLB: true, scale: 1 },
-                    { name: 'Coffee Table', path: 'models/10.glb', isGLB: true, scale: 1 }
-                ],
-                'Chairs': [
-                    { name: 'Dining Chair', path: 'models/11.glb', isGLB: true, scale: 1 },
-                    { name: 'Bar Stool', path: 'models/12.glb', isGLB: true, scale: 1 }
-                ]
-            },
-            'Utility': {
-                'Storage': [
-                    { name: 'Bookshelf', path: 'models/13.glb', isGLB: true, scale: 1 },
-                    { name: 'Cabinet', path: 'models/14.glb', isGLB: true, scale: 1 }
-                ],
-                'Decor': [
-                    { name: 'Table Lamp', path: 'models/15.glb', isGLB: true, scale: 1 },
-                    { name: 'Plant Pot', path: 'models/16.glb', isGLB: true, scale: 1 }
-                ]
-            }
-        };
+        // Simple array of models
+        this.models = [
+            { name: 'Modern TV Unit', path: 'models/1.glb', isGLB: true, scale: 1 },
+            { name: 'Classic TV Unit', path: 'models/2.glb', isGLB: true, scale: 1 },
+            { name: 'L-Shaped Sofa', path: 'models/3.glb', isGLB: true, scale: 1 },
+            { name: '3-Seater Sofa', path: 'models/4.glb', isGLB: true, scale: 1 },
+            { name: 'Double Bed', path: 'models/5.glb', isGLB: true, scale: 1 },
+            { name: 'Single Bed', path: 'models/6.glb', isGLB: true, scale: 1 },
+            { name: 'Sliding Wardrobe', path: 'models/7.glb', isGLB: true, scale: 1 },
+            { name: '2-Door Wardrobe', path: 'models/8.glb', isGLB: true, scale: 1 },
+            { name: 'Dining Table', path: 'models/9.glb', isGLB: true, scale: 1 },
+            { name: 'Coffee Table', path: 'models/10.glb', isGLB: true, scale: 1 },
+            { name: 'Dining Chair', path: 'models/11.glb', isGLB: true, scale: 1 },
+            { name: 'Bar Stool', path: 'models/12.glb', isGLB: true, scale: 1 },
+            { name: 'Bookshelf', path: 'models/13.glb', isGLB: true, scale: 1 },
+            { name: 'Cabinet', path: 'models/14.glb', isGLB: true, scale: 1 },
+            { name: 'Table Lamp', path: 'models/15.glb', isGLB: true, scale: 1 },
+            { name: 'Plant Pot', path: 'models/16.glb', isGLB: true, scale: 1 }
+        ];
 
         // Initialize managers and scene
         this.sceneManager = new SceneManager(document.getElementById('canvas-container'));
@@ -64,42 +40,15 @@ class BlockCustomizer {
     }
 
     createBlockPalette() {
-        // Remove any existing palette
-        const existingPalette = document.getElementById('block-palette');
-        if (existingPalette) {
-            existingPalette.remove();
-        }
-
-        // Create main container
-        const sidebar = document.createElement('div');
-        sidebar.id = 'block-palette';
-        sidebar.style.cssText = `
-            position: fixed;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 300px;
-            background-color: rgba(255, 255, 255, 0.95);
-            padding: 20px;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-            font-family: 'Arial', sans-serif;
-            overflow-y: auto;
-            backdrop-filter: blur(10px);
-            border-right: 1px solid rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        `;
-
+        const sidebar = document.getElementById('sidebar');
+        sidebar.innerHTML = ''; // Clear existing content
+        
         // Add header with clear button
         const header = document.createElement('div');
         header.style.cssText = `
-            padding-bottom: 15px;
+            padding: 20px;
             border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-            position: sticky;
-            top: 0;
-            background: rgba(255, 255, 255, 0.95);
-            z-index: 1;
+            background: #f5f5f5;
         `;
 
         const titleContainer = document.createElement('div');
@@ -119,7 +68,6 @@ class BlockCustomizer {
             font-weight: 600;
         `;
 
-        // Add clear room button
         const clearButton = document.createElement('button');
         clearButton.textContent = 'Clear Room';
         clearButton.style.cssText = `
@@ -128,29 +76,11 @@ class BlockCustomizer {
             border: none;
             padding: 8px 16px;
             border-radius: 6px;
-            font-size: 14px;
             cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 500;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            font-size: 14px;
         `;
 
-        // Add hover effect
-        clearButton.addEventListener('mouseenter', () => {
-            clearButton.style.backgroundColor = '#ff6666';
-            clearButton.style.transform = 'translateY(-1px)';
-            clearButton.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
-        });
-
-        clearButton.addEventListener('mouseleave', () => {
-            clearButton.style.backgroundColor = '#ff4444';
-            clearButton.style.transform = 'translateY(0)';
-            clearButton.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-        });
-
-        // Add click handler
         clearButton.addEventListener('click', () => {
-            // Remove all objects
             [...this.objectManager.objects].forEach(object => {
                 this.sceneManager.removeObject(object);
                 this.objectManager.removeObject(object);
@@ -159,175 +89,90 @@ class BlockCustomizer {
 
         titleContainer.appendChild(title);
         titleContainer.appendChild(clearButton);
-
-        const subtitle = document.createElement('p');
-        subtitle.textContent = 'Design your perfect space';
-        subtitle.style.cssText = `
-            margin: 5px 0 0 0;
-            color: #666;
-            font-size: 14px;
-        `;
-
         header.appendChild(titleContainer);
-        header.appendChild(subtitle);
         sidebar.appendChild(header);
 
-        // Create category accordion
-        Object.entries(this.productCategories).forEach(([category, subcategories]) => {
-            const categorySection = document.createElement('div');
-            categorySection.className = 'category-section';
-            categorySection.style.cssText = `
+        // Create model list container
+        const modelList = document.createElement('div');
+        modelList.style.cssText = `
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            max-height: calc(100vh - 100px);
+        `;
+
+        // Add models
+        this.models.forEach(item => {
+            const modelItem = document.createElement('div');
+            modelItem.draggable = true;
+            modelItem.style.cssText = `
+                padding: 15px;
+                background: white;
                 border: 1px solid rgba(0, 0, 0, 0.1);
-                border-radius: 8px;
-                overflow: hidden;
+                border-radius: 6px;
+                cursor: move;
+                font-size: 14px;
+                transition: all 0.2s;
+                user-select: none;
             `;
 
-            // Category header
-            const categoryHeader = document.createElement('div');
-            categoryHeader.className = 'category-header';
-            categoryHeader.style.cssText = `
-                padding: 15px;
-                background: #f5f5f5;
-                cursor: pointer;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                font-weight: 500;
-            `;
-            categoryHeader.innerHTML = `
-                ${category}
-                <span class="arrow">▼</span>
-            `;
+            modelItem.textContent = item.name;
 
-            // Category content
-            const categoryContent = document.createElement('div');
-            categoryContent.className = 'category-content';
-            categoryContent.style.cssText = `
-                padding: 15px;
-                display: none;
-            `;
-
-            // Toggle category content
-            categoryHeader.addEventListener('click', () => {
-                const isExpanded = categoryContent.style.display === 'block';
-                categoryContent.style.display = isExpanded ? 'none' : 'block';
-                categoryHeader.querySelector('.arrow').textContent = isExpanded ? '▼' : '▲';
+            // Add hover effects
+            modelItem.addEventListener('mouseenter', () => {
+                modelItem.style.transform = 'translateX(5px)';
+                modelItem.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                modelItem.style.borderColor = '#4CAF50';
             });
 
-            // Add subcategories
-            Object.entries(subcategories).forEach(([subcategory, items]) => {
-                const subcategoryDiv = document.createElement('div');
-                subcategoryDiv.style.cssText = `
-                    margin-bottom: 15px;
-                `;
-
-                const subcategoryTitle = document.createElement('h4');
-                subcategoryTitle.textContent = subcategory;
-                subcategoryTitle.style.cssText = `
-                    margin: 0 0 10px 0;
-                    color: #444;
-                    font-size: 14px;
-                    font-weight: 500;
-                `;
-
-                const itemsGrid = document.createElement('div');
-                itemsGrid.style.cssText = `
-                    display: grid;
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 10px;
-                `;
-
-                items.forEach(item => {
-                    const itemElement = document.createElement('div');
-                    itemElement.className = 'furniture-item';
-                    itemElement.draggable = true;
-                    itemElement.style.cssText = `
-                        padding: 10px;
-                        background: white;
-                        border: 1px solid rgba(0, 0, 0, 0.1);
-                        border-radius: 6px;
-                        cursor: move;
-                        text-align: center;
-                        font-size: 12px;
-                        transition: all 0.2s;
-                    `;
-
-                    itemElement.textContent = item.name;
-
-                    // Add hover effects
-                    itemElement.addEventListener('mouseenter', () => {
-                        itemElement.style.transform = 'translateY(-2px)';
-                        itemElement.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-                    });
-
-                    itemElement.addEventListener('mouseleave', () => {
-                        itemElement.style.transform = 'translateY(0)';
-                        itemElement.style.boxShadow = 'none';
-                    });
-
-                    itemElement.addEventListener('dragstart', (e) => {
-                        e.dataTransfer.effectAllowed = 'move';
-                        this.dragDropManager.handleDragStart(e, item);
-                    });
-
-                    itemElement.addEventListener('dragend', (e) => {
-                        e.preventDefault();
-                        if (this.dragDropManager.isDragging) {
-                            this.dragDropManager.isDragging = false;
-                            this.dragDropManager.rotationIndicator.style.display = 'none';
-                            if (this.dragDropManager.objectManager.previewMesh) {
-                                this.dragDropManager.sceneManager.removeObject(this.dragDropManager.objectManager.previewMesh);
-                                this.dragDropManager.objectManager.previewMesh = null;
-                            }
-                        }
-                    });
-
-                    itemsGrid.appendChild(itemElement);
-                });
-
-                subcategoryDiv.appendChild(subcategoryTitle);
-                subcategoryDiv.appendChild(itemsGrid);
-                categoryContent.appendChild(subcategoryDiv);
+            modelItem.addEventListener('mouseleave', () => {
+                modelItem.style.transform = 'translateX(0)';
+                modelItem.style.boxShadow = 'none';
+                modelItem.style.borderColor = 'rgba(0, 0, 0, 0.1)';
             });
 
-            categorySection.appendChild(categoryHeader);
-            categorySection.appendChild(categoryContent);
-            sidebar.appendChild(categorySection);
+            modelItem.addEventListener('dragstart', (e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                modelItem.style.opacity = '0.5';
+                this.dragDropManager.handleDragStart(e, item);
+            });
+
+            modelItem.addEventListener('dragend', (e) => {
+                e.preventDefault();
+                modelItem.style.opacity = '1';
+                if (this.dragDropManager.isDragging) {
+                    this.dragDropManager.isDragging = false;
+                    if (this.dragDropManager.objectManager.previewMesh) {
+                        this.dragDropManager.sceneManager.removeObject(this.dragDropManager.objectManager.previewMesh);
+                        this.dragDropManager.objectManager.previewMesh = null;
+                    }
+                }
+            });
+
+            modelList.appendChild(modelItem);
         });
 
-        document.body.appendChild(sidebar);
+        sidebar.appendChild(modelList);
 
-        // Add global styles
+        // Add custom scrollbar styles
         const style = document.createElement('style');
         style.textContent = `
-            .furniture-item:active {
-                cursor: grabbing;
-            }
-            
-            @keyframes slideIn {
-                from { transform: translateX(-100%); }
-                to { transform: translateX(0); }
-            }
-            
-            #block-palette {
-                animation: slideIn 0.3s ease-out;
-            }
-
-            /* Custom scrollbar */
-            #block-palette::-webkit-scrollbar {
+            #sidebar::-webkit-scrollbar {
                 width: 8px;
             }
 
-            #block-palette::-webkit-scrollbar-track {
+            #sidebar::-webkit-scrollbar-track {
                 background: rgba(0, 0, 0, 0.05);
             }
 
-            #block-palette::-webkit-scrollbar-thumb {
+            #sidebar::-webkit-scrollbar-thumb {
                 background: rgba(0, 0, 0, 0.2);
                 border-radius: 4px;
             }
 
-            #block-palette::-webkit-scrollbar-thumb:hover {
+            #sidebar::-webkit-scrollbar-thumb:hover {
                 background: rgba(0, 0, 0, 0.3);
             }
         `;
@@ -340,23 +185,21 @@ class BlockCustomizer {
         buttonContainer.style.bottom = '20px';
         buttonContainer.style.left = '50%';
         buttonContainer.style.transform = 'translateX(-50%)';
-
-        const undoBtn = document.createElement('button');
-        undoBtn.id = 'undo-btn';
-        undoBtn.textContent = 'Undo';
-        undoBtn.style.marginRight = '10px';
-
-        const redoBtn = document.createElement('button');
-        redoBtn.id = 'redo-btn';
-        redoBtn.textContent = 'Redo';
-        redoBtn.style.marginRight = '10px';
+        buttonContainer.style.zIndex = '100';
 
         const resetBtn = document.createElement('button');
         resetBtn.id = 'reset-btn';
         resetBtn.textContent = 'Reset Scene';
+        resetBtn.style.cssText = `
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        `;
 
-        buttonContainer.appendChild(undoBtn);
-        buttonContainer.appendChild(redoBtn);
         buttonContainer.appendChild(resetBtn);
         document.body.appendChild(buttonContainer);
     }
@@ -364,7 +207,6 @@ class BlockCustomizer {
     setupEventListeners() {
         const canvasContainer = document.getElementById('canvas-container');
         
-        // Prevent default drag behaviors
         canvasContainer.addEventListener('dragenter', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -388,21 +230,15 @@ class BlockCustomizer {
             this.dragDropManager.handleDrop(e);
         });
 
-        document.getElementById('undo-btn').addEventListener('click', () => this.undo());
-        document.getElementById('redo-btn').addEventListener('click', () => this.redo());
         document.getElementById('reset-btn').addEventListener('click', () => this.resetScene());
+
+        window.addEventListener('resize', () => {
+            this.sceneManager.onWindowResize();
+        });
     }
 
     animate() {
         this.sceneManager.animate();
-    }
-
-    undo() {
-        // Implement undo functionality
-    }
-
-    redo() {
-        // Implement redo functionality
     }
 
     resetScene() {
@@ -413,7 +249,7 @@ class BlockCustomizer {
         this.objectManager.objects = [];
         
         // Reset camera
-        this.sceneManager.camera.position.set(5, 5, 10);
+        this.sceneManager.camera.position.set(8, 5, 12);
         this.sceneManager.camera.lookAt(0, 0, 0);
         this.sceneManager.controls.reset();
     }
