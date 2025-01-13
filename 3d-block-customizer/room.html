@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>3D Block Customizer</title>
     <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/sidebar.css">
     <script async src="https://unpkg.com/es-module-shims/dist/es-module-shims.js"></script>
     <script type="importmap">
     {
@@ -16,12 +17,14 @@
     </script>
 </head>
 <body>
-    <div id="app-container">
-        <div id="sidebar">
-            <h2>Block Library</h2>
-            <div id="block-palette"></div>
-        </div>
+    <!-- The sidebar will be dynamically created by Sidebar.js -->
+    <div class="main-content">
         <div id="canvas-container"></div>
+        <div id="controls">
+            <button id="save-btn">Save Scene</button>
+            <button id="load-btn">Load Scene</button>
+            <button id="clear-btn">Clear Scene</button>
+        </div>
     </div>
     <script type="module" src="src/app.js"></script>
 </body>

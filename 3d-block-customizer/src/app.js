@@ -1,10 +1,10 @@
 import { SceneManager } from './managers/SceneManager.js';
 import { ObjectManager } from './managers/ObjectManager.js';
 import { DragDropManager } from './managers/DragDropManager.js';
+import Sidebar from './components/Sidebar.js';
 
 class BlockCustomizer {
     constructor() {
-        // Simple array of models
         this.models = [
             { name: 'Modern TV Unit', path: 'models/1.glb', isGLB: true, scale: 1 },
             { name: 'Classic TV Unit', path: 'models/2.glb', isGLB: true, scale: 1 },
@@ -24,213 +24,153 @@ class BlockCustomizer {
             { name: 'Plant Pot', path: 'models/16.glb', isGLB: true, scale: 1 }
         ];
 
-        // Initialize managers and scene
-        this.sceneManager = new SceneManager(document.getElementById('canvas-container'));
-        this.objectManager = new ObjectManager();
+        // Wait for DOM to be ready before initializing
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.init());
+        } else {
+            this.init();
+        }
+    }
+
+    init() {
+        // Initialize scene and managers
+        const container = document.getElementById('canvas-container');
+        if (!container) {
+            console.error('Canvas container not found');
+            return;
+        }
+
+        this.sceneManager = new SceneManager(container);
+        this.objectManager = new ObjectManager(this.sceneManager);
         this.dragDropManager = new DragDropManager(this.sceneManager, this.objectManager);
-        
-        this.setupUI();
+
+        // Initialize sidebar
+        this.sidebar = new Sidebar();
+
+        // Listen for wardrobe selection
+        document.addEventListener('wardrobeSelected', (event) => {
+            const { selectedImage, availableModels } = event.detail;
+            this.filterModels(availableModels);
+        });
+
         this.setupEventListeners();
-        this.animate();
-    }
-
-    setupUI() {
-        this.createBlockPalette();
-        this.createButtons();
-    }
-
-    createBlockPalette() {
-        const sidebar = document.getElementById('sidebar');
-        sidebar.innerHTML = ''; // Clear existing content
         
-        // Add header with clear button
-        const header = document.createElement('div');
-        header.style.cssText = `
-            padding: 20px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-            background: #f5f5f5;
-        `;
-
-        const titleContainer = document.createElement('div');
-        titleContainer.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        `;
-
-        const title = document.createElement('h2');
-        title.textContent = 'Furniture Library';
-        title.style.cssText = `
-            margin: 0;
-            color: #333;
-            font-size: 20px;
-            font-weight: 600;
-        `;
-
-        const clearButton = document.createElement('button');
-        clearButton.textContent = 'Clear Room';
-        clearButton.style.cssText = `
-            background-color: #ff4444;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        `;
-
-        clearButton.addEventListener('click', () => {
-            [...this.objectManager.objects].forEach(object => {
-                this.sceneManager.removeObject(object);
-                this.objectManager.removeObject(object);
-            });
-        });
-
-        titleContainer.appendChild(title);
-        titleContainer.appendChild(clearButton);
-        header.appendChild(titleContainer);
-        sidebar.appendChild(header);
-
-        // Create model list container
-        const modelList = document.createElement('div');
-        modelList.style.cssText = `
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            overflow-y: auto;
-            max-height: calc(100vh - 100px);
-        `;
-
-        // Add models
-        this.models.forEach(item => {
-            const modelItem = document.createElement('div');
-            modelItem.draggable = true;
-            modelItem.style.cssText = `
-                padding: 15px;
-                background: white;
-                border: 1px solid rgba(0, 0, 0, 0.1);
-                border-radius: 6px;
-                cursor: move;
-                font-size: 14px;
-                transition: all 0.2s;
-                user-select: none;
-            `;
-
-            modelItem.textContent = item.name;
-
-            // Add hover effects
-            modelItem.addEventListener('mouseenter', () => {
-                modelItem.style.transform = 'translateX(5px)';
-                modelItem.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
-                modelItem.style.borderColor = '#4CAF50';
-            });
-
-            modelItem.addEventListener('mouseleave', () => {
-                modelItem.style.transform = 'translateX(0)';
-                modelItem.style.boxShadow = 'none';
-                modelItem.style.borderColor = 'rgba(0, 0, 0, 0.1)';
-            });
-
-            modelItem.addEventListener('dragstart', (e) => {
-                e.dataTransfer.effectAllowed = 'move';
-                modelItem.style.opacity = '0.5';
-                this.dragDropManager.handleDragStart(e, item);
-            });
-
-            modelItem.addEventListener('dragend', (e) => {
-                e.preventDefault();
-                modelItem.style.opacity = '1';
-                if (this.dragDropManager.isDragging) {
-                    this.dragDropManager.isDragging = false;
-                    if (this.dragDropManager.objectManager.previewMesh) {
-                        this.dragDropManager.sceneManager.removeObject(this.dragDropManager.objectManager.previewMesh);
-                        this.dragDropManager.objectManager.previewMesh = null;
-                    }
-                }
-            });
-
-            modelList.appendChild(modelItem);
-        });
-
-        sidebar.appendChild(modelList);
-
-        // Add custom scrollbar styles
-        const style = document.createElement('style');
-        style.textContent = `
-            #sidebar::-webkit-scrollbar {
-                width: 8px;
-            }
-
-            #sidebar::-webkit-scrollbar-track {
-                background: rgba(0, 0, 0, 0.05);
-            }
-
-            #sidebar::-webkit-scrollbar-thumb {
-                background: rgba(0, 0, 0, 0.2);
-                border-radius: 4px;
-            }
-
-            #sidebar::-webkit-scrollbar-thumb:hover {
-                background: rgba(0, 0, 0, 0.3);
-            }
-        `;
-        document.head.appendChild(style);
+        // Start the animation loop
+        this.sceneManager.animate();
     }
 
-    createButtons() {
-        const buttonContainer = document.createElement('div');
-        buttonContainer.style.position = 'fixed';
-        buttonContainer.style.bottom = '20px';
-        buttonContainer.style.left = '50%';
-        buttonContainer.style.transform = 'translateX(-50%)';
-        buttonContainer.style.zIndex = '100';
+    filterModels(availableModels) {
+        // Create or get the models container
+        let modelsContainer = document.querySelector('.models-container');
+        if (!modelsContainer) {
+            modelsContainer = document.createElement('div');
+            modelsContainer.className = 'models-container';
+            modelsContainer.style.cssText = `
+                position: fixed;
+                right: 20px;
+                top: 20px;
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                max-height: 80vh;
+                overflow-y: auto;
+                z-index: 1000;
+            `;
+            document.body.appendChild(modelsContainer);
+        }
 
-        const resetBtn = document.createElement('button');
-        resetBtn.id = 'reset-btn';
-        resetBtn.textContent = 'Reset Scene';
-        resetBtn.style.cssText = `
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        `;
+        // Clear existing content
+        modelsContainer.innerHTML = '<h3 style="margin-bottom: 15px;">Available Models</h3>';
 
-        buttonContainer.appendChild(resetBtn);
-        document.body.appendChild(buttonContainer);
+        // Filter and display available models
+        this.models.forEach((model, index) => {
+            if (availableModels.includes((index + 1).toString())) {
+                const modelBtn = document.createElement('div');
+                modelBtn.textContent = model.name;
+                modelBtn.className = 'model-option';
+                modelBtn.draggable = true;
+                modelBtn.dataset.modelId = (index + 1).toString();
+                modelBtn.style.cssText = `
+                    display: block;
+                    width: 100%;
+                    padding: 10px;
+                    margin: 5px 0;
+                    background: #f5f5f5;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    cursor: move;
+                    transition: all 0.2s;
+                    user-select: none;
+                `;
+
+                // Add hover effects
+                modelBtn.addEventListener('mouseenter', () => {
+                    modelBtn.style.transform = 'translateX(5px)';
+                    modelBtn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                    modelBtn.style.borderColor = '#4CAF50';
+                });
+
+                modelBtn.addEventListener('mouseleave', () => {
+                    modelBtn.style.transform = 'translateX(0)';
+                    modelBtn.style.boxShadow = 'none';
+                    modelBtn.style.borderColor = '#ddd';
+                });
+
+                // Add drag and drop functionality
+                modelBtn.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.effectAllowed = 'move';
+                    modelBtn.style.opacity = '0.5';
+                    this.dragDropManager.handleDragStart(e, model);
+                });
+
+                modelBtn.addEventListener('dragend', (e) => {
+                    e.preventDefault();
+                    modelBtn.style.opacity = '1';
+                    if (this.dragDropManager.isDragging) {
+                        this.dragDropManager.isDragging = false;
+                        if (this.dragDropManager.objectManager.previewMesh) {
+                            this.dragDropManager.sceneManager.removeObject(this.dragDropManager.objectManager.previewMesh);
+                            this.dragDropManager.objectManager.previewMesh = null;
+                        }
+                    }
+                });
+
+                modelsContainer.appendChild(modelBtn);
+            }
+        });
     }
 
     setupEventListeners() {
+        const saveBtn = document.getElementById('save-btn');
+        const loadBtn = document.getElementById('load-btn');
+        const clearBtn = document.getElementById('clear-btn');
+
+        if (saveBtn) saveBtn.addEventListener('click', () => this.sceneManager.saveScene());
+        if (loadBtn) loadBtn.addEventListener('click', () => this.sceneManager.loadScene());
+        if (clearBtn) clearBtn.addEventListener('click', () => this.resetScene());
+
         const canvasContainer = document.getElementById('canvas-container');
         
         canvasContainer.addEventListener('dragenter', (e) => {
             e.preventDefault();
-            e.stopPropagation();
-        });
-        
-        canvasContainer.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.dragDropManager.handleDragOver(e);
-        });
-        
-        canvasContainer.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.dragDropManager.handleDragLeave(e);
-        });
-        
-        canvasContainer.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.dragDropManager.handleDrop(e);
+            this.dragDropManager.handleDragEnter(e);
         });
 
-        document.getElementById('reset-btn').addEventListener('click', () => this.resetScene());
+        canvasContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            this.dragDropManager.handleDragOver(e);
+        });
+
+        canvasContainer.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            this.dragDropManager.handleDragLeave(e);
+        });
+
+        canvasContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            this.dragDropManager.handleDrop(e);
+        });
 
         window.addEventListener('resize', () => {
             this.sceneManager.onWindowResize();
@@ -238,20 +178,16 @@ class BlockCustomizer {
     }
 
     animate() {
-        this.sceneManager.animate();
+        if (this.sceneManager) {
+            this.sceneManager.render();
+            requestAnimationFrame(() => this.animate());
+        }
     }
 
     resetScene() {
-        // Remove all objects
-        this.objectManager.objects.forEach(obj => {
-            this.sceneManager.removeObject(obj);
-        });
-        this.objectManager.objects = [];
-        
-        // Reset camera
-        this.sceneManager.camera.position.set(8, 5, 12);
-        this.sceneManager.camera.lookAt(0, 0, 0);
-        this.sceneManager.controls.reset();
+        if (this.sceneManager) {
+            this.sceneManager.clearScene();
+        }
     }
 }
 
