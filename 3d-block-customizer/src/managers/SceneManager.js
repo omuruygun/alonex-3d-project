@@ -151,4 +151,20 @@ export class SceneManager {
     removeObject(object) {
         this.scene.remove(object);
     }
+
+    clearScene() {
+        // Remove all objects except ground and grid
+        const objectsToRemove = [];
+        this.scene.traverse((object) => {
+            // Skip ground plane and grid helper
+            if (!object.userData.isGround && !(object instanceof THREE.GridHelper) && 
+                !(object instanceof THREE.Light) && !(object instanceof THREE.Camera)) {
+                objectsToRemove.push(object);
+            }
+        });
+        
+        objectsToRemove.forEach(object => {
+            this.scene.remove(object);
+        });
+    }
 }
