@@ -6,22 +6,22 @@ import Sidebar from './components/Sidebar.js';
 class BlockCustomizer {
     constructor() {
         this.models = [
-            { name: 'Modern TV Unit', path: 'models/1.glb', isGLB: true, scale: 1 },
-            { name: 'Classic TV Unit', path: 'models/2.glb', isGLB: true, scale: 1 },
-            { name: 'L-Shaped Sofa', path: 'models/3.glb', isGLB: true, scale: 1 },
-            { name: '3-Seater Sofa', path: 'models/4.glb', isGLB: true, scale: 1 },
-            { name: 'Double Bed', path: 'models/5.glb', isGLB: true, scale: 1 },
-            { name: 'Single Bed', path: 'models/6.glb', isGLB: true, scale: 1 },
-            { name: 'Sliding Wardrobe', path: 'models/7.glb', isGLB: true, scale: 1 },
-            { name: '2-Door Wardrobe', path: 'models/8.glb', isGLB: true, scale: 1 },
-            { name: 'Dining Table', path: 'models/9.glb', isGLB: true, scale: 1 },
-            { name: 'Coffee Table', path: 'models/10.glb', isGLB: true, scale: 1 },
-            { name: 'Dining Chair', path: 'models/11.glb', isGLB: true, scale: 1 },
-            { name: 'Bar Stool', path: 'models/12.glb', isGLB: true, scale: 1 },
-            { name: 'Bookshelf', path: 'models/13.glb', isGLB: true, scale: 1 },
-            { name: 'Cabinet', path: 'models/14.glb', isGLB: true, scale: 1 },
-            { name: 'Table Lamp', path: 'models/15.glb', isGLB: true, scale: 1 },
-            { name: 'Plant Pot', path: 'models/16.glb', isGLB: true, scale: 1 }
+            { name: 'Modern TV Unit', path: 'models/1.glb', isGLB: true, scale: 0.5 },
+            { name: 'Classic TV Unit', path: 'models/2.glb', isGLB: true, scale: 0.5 },
+            { name: 'L-Shaped Sofa', path: 'models/3.glb', isGLB: true, scale: 0.5 },
+            { name: '3-Seater Sofa', path: 'models/4.glb', isGLB: true, scale: 0.5 },
+            { name: 'Double Bed', path: 'models/5.glb', isGLB: true, scale: 0.5 },
+            { name: 'Single Bed', path: 'models/6.glb', isGLB: true, scale: 0.5 },
+            { name: 'Sliding Wardrobe', path: 'models/7.glb', isGLB: true, scale: 0.5 },
+            { name: '2-Door Wardrobe', path: 'models/8.glb', isGLB: true, scale: 0.5 },
+            { name: 'Dining Table', path: 'models/9.glb', isGLB: true, scale: 0.5 },
+            { name: 'Coffee Table', path: 'models/10.glb', isGLB: true, scale: 0.5 },
+            { name: 'Dining Chair', path: 'models/11.glb', isGLB: true, scale: 0.5 },
+            { name: 'Bar Stool', path: 'models/12.glb', isGLB: true, scale: 0.5 },
+            { name: 'Bookshelf', path: 'models/13.glb', isGLB: true, scale: 0.5 },
+            { name: 'Cabinet', path: 'models/14.glb', isGLB: true, scale: 0.5 },
+            { name: 'Table Lamp', path: 'models/15.glb', isGLB: true, scale: 0.5 },
+            { name: 'Plant Pot', path: 'models/16.glb', isGLB: true, scale: 0.5 }
         ];
 
         // Wait for DOM to be ready before initializing
@@ -51,6 +51,11 @@ class BlockCustomizer {
         document.addEventListener('wardrobeSelected', (event) => {
             const { selectedImage, availableModels } = event.detail;
             this.filterModels(availableModels);
+        });
+
+        // Listen for create modern room event
+        document.addEventListener('createModernRoom', () => {
+            this.sceneManager.createModernRoom();
         });
 
         this.setupEventListeners();

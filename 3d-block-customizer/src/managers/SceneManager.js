@@ -33,7 +33,7 @@ export class SceneManager {
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
-        this.controls.minDistance = 3;
+        this.controls.minDistance = 1;
         this.controls.maxDistance = 20;
         this.controls.maxPolarAngle = Math.PI / 2;
     }
@@ -153,12 +153,15 @@ export class SceneManager {
     }
 
     clearScene() {
-        // Remove all objects except ground and grid
+        // Remove all objects except ground, grid, and room elements
         const objectsToRemove = [];
         this.scene.traverse((object) => {
-            // Skip ground plane and grid helper
-            if (!object.userData.isGround && !(object instanceof THREE.GridHelper) && 
-                !(object instanceof THREE.Light) && !(object instanceof THREE.Camera)) {
+            // Skip ground plane, grid helper, lights, camera, and room elements
+            if (!object.userData.isGround && 
+                !(object instanceof THREE.GridHelper) && 
+                !(object instanceof THREE.Light) && 
+                !(object instanceof THREE.Camera) &&
+                !object.userData.isRoomElement) {  
                 objectsToRemove.push(object);
             }
         });
@@ -166,5 +169,83 @@ export class SceneManager {
         objectsToRemove.forEach(object => {
             this.scene.remove(object);
         });
+    }
+
+    createModernRoom() {
+        // Remove any existing walls but keep the ground
+        this.scene.traverse((object) => {
+            if (object.userData.isRoomElement) {
+                this.scene.remove(object);
+            }
+        });
+
+        // Room dimensions
+        const roomWidth = 10;  
+        const roomLength = 10; 
+        const roomHeight = 3;  
+        const wallThickness = 0.1; 
+
+        // Create walls with a warm beige color
+        const wallMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xF5E6D3,
+            roughness: 0.7,
+            metalness: 0.1
+        });
+
+        // Back wall
+        const backWall = new THREE.Mesh(
+            new THREE.BoxGeometry(roomWidth, roomHeight, wallThickness),
+            wallMaterial
+        );
+        backWall.position.set(0, roomHeight/2, -roomLength/2);
+        backWall.castShadow = true;
+        backWall.receiveShadow = true;
+        backWall.userData.isRoomElement = true;
+        this.scene.add(backWall);
+
+        // Left wall
+        const leftWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, roomHeight, roomLength),
+            wallMaterial
+        );
+        leftWall.position.set(-roomWidth/2, roomHeight/2, 0);
+        leftWall.castShadow = true;
+        leftWall.receiveShadow = true;
+        leftWall.userData.isRoomElement = true;
+        this.scene.add(leftWall);
+
+        // Right wall with window
+        const windowHeight = 2;    
+        const windowWidth = 3;     
+        const windowBottom = 0.8;  
+
+        // Lower wall
+        const rightWallLower = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, windowBottom, roomLength),
+            wallMaterial
+        );
+        rightWallLower.position.set(roomWidth/2, windowBottom/2, 0);
+        rightWallLower.castShadow = true;
+        rightWallLower.receiveShadow = true;
+        rightWallLower.userData.isRoomElement = true;
+        this.scene.add(rightWallLower);
+
+        // Upper wall
+        const upperWallHeight = roomHeight - (windowBottom + windowHeight);
+        const rightWallUpper = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, upperWallHeight, roomLength),
+            wallMaterial
+        );
+        rightWallUpper.position.set(roomWidth/2, roomHeight - upperWallHeight/2, 0);
+        rightWallUpper.castShadow = true;
+        rightWallUpper.receiveShadow = true;
+        rightWallUpper.userData.isRoomElement = true;
+        this.scene.add(rightWallUpper);
+
+        // Update camera position for better view
+        this.camera.position.set(roomWidth/3, roomHeight/2, roomLength/3);
+        this.camera.lookAt(0, roomHeight/3, 0);
+        this.controls.target.set(0, roomHeight/3, 0);
+        this.controls.update();
     }
 }
