@@ -21,6 +21,9 @@ export class SceneManager {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.outputEncoding = THREE.sRGBEncoding;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.0;
+        this.renderer.physicallyCorrectLights = true;
         container.appendChild(this.renderer.domElement);
     }
 
@@ -39,38 +42,22 @@ export class SceneManager {
     }
 
     setupLights() {
-        // Ambient light
+        // Ambient light for overall scene illumination
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         this.scene.add(ambientLight);
 
-        // Main directional light
-        const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        mainLight.position.set(5, 8, 5);
+        // Main directional light with shadows
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+        mainLight.position.set(5, 10, 7);
         mainLight.castShadow = true;
         mainLight.shadow.mapSize.width = 2048;
         mainLight.shadow.mapSize.height = 2048;
-        mainLight.shadow.camera.near = 0.5;
-        mainLight.shadow.camera.far = 50;
-        mainLight.shadow.camera.left = -10;
-        mainLight.shadow.camera.right = 10;
-        mainLight.shadow.camera.top = 10;
-        mainLight.shadow.camera.bottom = -10;
         this.scene.add(mainLight);
 
-        // Fill light
+        // Additional fill light
         const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
-        fillLight.position.set(-5, 3, -5);
+        fillLight.position.set(-5, 5, -5);
         this.scene.add(fillLight);
-
-        // Window light
-        const windowLight = new THREE.SpotLight(0xffffff, 0.5);
-        windowLight.position.set(0, 8, -8);
-        windowLight.angle = Math.PI / 4;
-        windowLight.penumbra = 0.5;
-        windowLight.decay = 2;
-        windowLight.distance = 15;
-        windowLight.castShadow = true;
-        this.scene.add(windowLight);
     }
 
     setupGround() {

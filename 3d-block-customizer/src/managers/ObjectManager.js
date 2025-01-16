@@ -111,11 +111,24 @@ export class ObjectManager {
                         clonedMesh.castShadow = true;
                         clonedMesh.receiveShadow = true;
                         
-                        // Adjust material properties
+                        // Handle materials
                         if (clonedMesh.material) {
                             clonedMesh.material = clonedMesh.material.clone();
-                            clonedMesh.material.metalness = 0.1;
-                            clonedMesh.material.roughness = 0.8;
+                            
+                            // Special handling for glass materials
+                            if (clonedMesh.material.name.toLowerCase().includes('glass')) {
+                                clonedMesh.material.transparent = true;
+                                clonedMesh.material.opacity = 0.3;
+                                clonedMesh.material.roughness = 0.1;
+                                clonedMesh.material.metalness = 0.9;
+                                clonedMesh.material.envMapIntensity = 1.5;
+                            } else {
+                                clonedMesh.material.metalness = 0.1;
+                                clonedMesh.material.roughness = 0.8;
+                            }
+                            
+                            clonedMesh.material.envMapIntensity = 1.0;
+                            clonedMesh.material.needsUpdate = true;
                         }
                         
                         processedGroup.add(clonedMesh);
