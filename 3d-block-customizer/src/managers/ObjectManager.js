@@ -111,23 +111,32 @@ export class ObjectManager {
                         clonedMesh.castShadow = true;
                         clonedMesh.receiveShadow = true;
                         
-                        // Handle materials
+                        // Enhance materials
                         if (clonedMesh.material) {
                             clonedMesh.material = clonedMesh.material.clone();
                             
-                            // Special handling for glass materials
+                            // Handle glass materials
                             if (clonedMesh.material.name.toLowerCase().includes('glass')) {
                                 clonedMesh.material.transparent = true;
-                                clonedMesh.material.opacity = 0.3;
-                                clonedMesh.material.roughness = 0.1;
+                                clonedMesh.material.opacity = 0.6; // More visible glass
+                                clonedMesh.material.roughness = 0;
                                 clonedMesh.material.metalness = 0.9;
-                                clonedMesh.material.envMapIntensity = 1.5;
-                            } else {
+                                clonedMesh.material.envMapIntensity = 2.0;
+                                clonedMesh.material.side = THREE.DoubleSide;
+                            } else if (clonedMesh.material.name.toLowerCase().includes('white') || 
+                                     clonedMesh.material.color.getHexString() === 'ffffff') {
+                                // Enhance white materials
                                 clonedMesh.material.metalness = 0.1;
-                                clonedMesh.material.roughness = 0.8;
+                                clonedMesh.material.roughness = 0.3;
+                                clonedMesh.material.envMapIntensity = 1.2;
+                            } else {
+                                // Default material enhancement
+                                clonedMesh.material.metalness = 0.2;
+                                clonedMesh.material.roughness = 0.4;
+                                clonedMesh.material.envMapIntensity = 1.0;
                             }
                             
-                            clonedMesh.material.envMapIntensity = 1.0;
+                            // Ensure materials update
                             clonedMesh.material.needsUpdate = true;
                         }
                         

@@ -6,11 +6,12 @@ export class SceneManager {
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.raycaster = new THREE.Raycaster();
         
         this.setupRenderer(container);
-        this.setupCamera();
+        this.setupScene();
         this.setupLights();
-        this.setupGround();
+        this.setupCamera();
         this.setupControls();
         
         window.addEventListener('resize', this.onWindowResize.bind(this));
@@ -22,13 +23,100 @@ export class SceneManager {
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.outputEncoding = THREE.sRGBEncoding;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.0;
+        this.renderer.toneMappingExposure = 1.2;
         this.renderer.physicallyCorrectLights = true;
         container.appendChild(this.renderer.domElement);
     }
 
+    setupScene() {
+        // Set modern white background
+        this.scene.background = new THREE.Color(0xffffff);
+        this.scene.fog = new THREE.Fog(0xffffff, 20, 100);
+
+        // Create modern room
+        this.createModernRoom();
+    }
+
+    createModernRoom() {
+        // Floor with grid for placement
+        const floorGeometry = new THREE.PlaneGeometry(50, 50);
+        const floorMaterial = new THREE.MeshStandardMaterial({
+            color: 0xf5f5f5,
+            roughness: 0.1,
+            metalness: 0.1
+        });
+        this.groundPlane = new THREE.Mesh(floorGeometry, floorMaterial);
+        this.groundPlane.rotation.x = -Math.PI / 2;
+        this.groundPlane.receiveShadow = true;
+        this.groundPlane.userData.isGround = true;  // Important for raycasting
+        this.scene.add(this.groundPlane);
+
+        // Add grid helper for placement
+        const size = 50;
+        const divisions = 50;
+        const gridHelper = new THREE.GridHelper(size, divisions, 0x888888, 0x888888);
+        gridHelper.position.y = 0.01; // Slightly above ground to prevent z-fighting
+        gridHelper.material.opacity = 0.1;
+        gridHelper.material.transparent = true;
+        this.scene.add(gridHelper);
+
+        // Store grid size for snapping calculations
+        this.gridSize = size / divisions;
+
+        // Back wall
+        const wallGeometry = new THREE.PlaneGeometry(50, 20);
+        const wallMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            roughness: 0.2,
+            metalness: 0.1
+        });
+        const backWall = new THREE.Mesh(wallGeometry, wallMaterial);
+        backWall.position.z = -25;
+        backWall.position.y = 10;
+        backWall.receiveShadow = true;
+        this.scene.add(backWall);
+
+        // Side wall
+        const sideWall = new THREE.Mesh(wallGeometry, wallMaterial);
+        sideWall.position.x = -25;
+        sideWall.position.y = 10;
+        sideWall.rotation.y = Math.PI / 2;
+        sideWall.receiveShadow = true;
+        this.scene.add(sideWall);
+    }
+
+    setupLights() {
+        // Ambient light for soft overall illumination
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        this.scene.add(ambientLight);
+
+        // Main directional light (simulating sunlight)
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        mainLight.position.set(10, 15, 10);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 50;
+        mainLight.shadow.camera.left = -20;
+        mainLight.shadow.camera.right = 20;
+        mainLight.shadow.camera.top = 20;
+        mainLight.shadow.camera.bottom = -20;
+        mainLight.shadow.bias = -0.001;
+        this.scene.add(mainLight);
+
+        // Fill light for softer shadows
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        fillLight.position.set(-10, 10, -10);
+        this.scene.add(fillLight);
+
+        // Additional soft light for better material visibility
+        const softLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.5);
+        this.scene.add(softLight);
+    }
+
     setupCamera() {
-        this.camera.position.set(8, 5, 12);
+        this.camera.position.set(12, 8, 12);
         this.camera.lookAt(0, 0, 0);
     }
 
@@ -39,84 +127,6 @@ export class SceneManager {
         this.controls.minDistance = 1;
         this.controls.maxDistance = 20;
         this.controls.maxPolarAngle = Math.PI / 2;
-    }
-
-    setupLights() {
-        // Ambient light for overall scene illumination
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        this.scene.add(ambientLight);
-
-        // Main directional light with shadows
-        const mainLight = new THREE.DirectionalLight(0xffffff, 1);
-        mainLight.position.set(5, 10, 7);
-        mainLight.castShadow = true;
-        mainLight.shadow.mapSize.width = 2048;
-        mainLight.shadow.mapSize.height = 2048;
-        this.scene.add(mainLight);
-
-        // Additional fill light
-        const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
-        fillLight.position.set(-5, 5, -5);
-        this.scene.add(fillLight);
-    }
-
-    setupGround() {
-        // Create ground plane with grid
-        const groundGeometry = new THREE.PlaneGeometry(100, 100);
-        
-        // Create canvas for the text
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = 2048;  // Higher resolution
-        canvas.height = 2048;
-        
-        // Set background
-        context.fillStyle = '#333333';
-        context.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Add text
-        context.font = 'bold 80px Arial';
-        context.fillStyle = '#FFFF00';  // Same yellow as grid
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        
-        // Add multiple instances of text for tiling effect
-        for(let y = canvas.height/4; y < canvas.height; y += canvas.height/2) {
-            for(let x = canvas.width/4; x < canvas.width; x += canvas.width/2) {
-                context.fillText('ALONEX MOBİLYA', x, y);
-            }
-        }
-        
-        // Create texture from canvas
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(1, 1);
-        
-        const groundMaterial = new THREE.MeshStandardMaterial({ 
-            map: texture,
-            side: THREE.DoubleSide
-        });
-        
-        this.groundPlane = new THREE.Mesh(groundGeometry, groundMaterial);
-        this.groundPlane.rotation.x = -Math.PI / 2;
-        this.groundPlane.position.y = 0;
-        this.groundPlane.receiveShadow = true;
-        this.groundPlane.userData.isGround = true;
-        
-        // Add grid helper
-        const size = 100;
-        const divisions = 100;
-        const gridHelper = new THREE.GridHelper(size, divisions, 0xFFFF00, 0xFFFF00);
-        gridHelper.position.y = 0.01; // Slightly above ground to prevent z-fighting
-        gridHelper.material.opacity = 0.2;
-        gridHelper.material.transparent = true;
-        
-        this.scene.add(this.groundPlane);
-        this.scene.add(gridHelper);
-        
-        // Store grid size for snapping calculations
-        this.gridSize = size / divisions;
     }
 
     onWindowResize() {
@@ -158,81 +168,21 @@ export class SceneManager {
         });
     }
 
-    createModernRoom() {
-        // Remove any existing walls but keep the ground
-        this.scene.traverse((object) => {
-            if (object.userData.isRoomElement) {
-                this.scene.remove(object);
-            }
-        });
+    getGroundIntersection(event) {
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-        // Room dimensions
-        const roomWidth = 10;  
-        const roomLength = 10; 
-        const roomHeight = 3;  
-        const wallThickness = 0.1; 
+        this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
+        const intersects = this.raycaster.intersectObjects([this.groundPlane]);
 
-        // Create walls with a warm beige color
-        const wallMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0xF5E6D3,
-            roughness: 0.7,
-            metalness: 0.1
-        });
-
-        // Back wall
-        const backWall = new THREE.Mesh(
-            new THREE.BoxGeometry(roomWidth, roomHeight, wallThickness),
-            wallMaterial
-        );
-        backWall.position.set(0, roomHeight/2, -roomLength/2);
-        backWall.castShadow = true;
-        backWall.receiveShadow = true;
-        backWall.userData.isRoomElement = true;
-        this.scene.add(backWall);
-
-        // Left wall
-        const leftWall = new THREE.Mesh(
-            new THREE.BoxGeometry(wallThickness, roomHeight, roomLength),
-            wallMaterial
-        );
-        leftWall.position.set(-roomWidth/2, roomHeight/2, 0);
-        leftWall.castShadow = true;
-        leftWall.receiveShadow = true;
-        leftWall.userData.isRoomElement = true;
-        this.scene.add(leftWall);
-
-        // Right wall with window
-        const windowHeight = 2;    
-        const windowWidth = 3;     
-        const windowBottom = 0.8;  
-
-        // Lower wall
-        const rightWallLower = new THREE.Mesh(
-            new THREE.BoxGeometry(wallThickness, windowBottom, roomLength),
-            wallMaterial
-        );
-        rightWallLower.position.set(roomWidth/2, windowBottom/2, 0);
-        rightWallLower.castShadow = true;
-        rightWallLower.receiveShadow = true;
-        rightWallLower.userData.isRoomElement = true;
-        this.scene.add(rightWallLower);
-
-        // Upper wall
-        const upperWallHeight = roomHeight - (windowBottom + windowHeight);
-        const rightWallUpper = new THREE.Mesh(
-            new THREE.BoxGeometry(wallThickness, upperWallHeight, roomLength),
-            wallMaterial
-        );
-        rightWallUpper.position.set(roomWidth/2, roomHeight - upperWallHeight/2, 0);
-        rightWallUpper.castShadow = true;
-        rightWallUpper.receiveShadow = true;
-        rightWallUpper.userData.isRoomElement = true;
-        this.scene.add(rightWallUpper);
-
-        // Update camera position for better view
-        this.camera.position.set(roomWidth/3, roomHeight/2, roomLength/3);
-        this.camera.lookAt(0, roomHeight/3, 0);
-        this.controls.target.set(0, roomHeight/3, 0);
-        this.controls.update();
+        if (intersects.length > 0) {
+            const point = intersects[0].point;
+            // Snap to grid
+            point.x = Math.round(point.x / this.gridSize) * this.gridSize;
+            point.z = Math.round(point.z / this.gridSize) * this.gridSize;
+            return point;
+        }
+        return null;
     }
 }
