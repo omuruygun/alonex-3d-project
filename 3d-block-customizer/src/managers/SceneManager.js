@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { ObjectManager } from './ObjectManager.js';
 
 export class SceneManager {
     constructor(container) {
@@ -7,6 +8,10 @@ export class SceneManager {
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+        
+        // Initialize ObjectManager
+        this.objectManager = new ObjectManager();
         
         this.setupRenderer(container);
         this.setupScene();
@@ -14,7 +19,10 @@ export class SceneManager {
         this.setupCamera();
         this.setupControls();
         
+        // Add click event listener for object selection
+        this.renderer.domElement.addEventListener('click', this.onMouseClick.bind(this));
         window.addEventListener('resize', this.onWindowResize.bind(this));
+        this.setupEventListeners();
     }
 
     setupRenderer(container) {
@@ -29,60 +37,67 @@ export class SceneManager {
     }
 
     setupScene() {
-        // Set modern white background
+        // Set background color
         this.scene.background = new THREE.Color(0xffffff);
-        this.scene.fog = new THREE.Fog(0xffffff, 20, 100);
 
-        // Create modern room
-        this.createModernRoom();
-    }
+        // Add fog for depth
+        this.scene.fog = new THREE.Fog(0xffffff, 20, 40);
 
-    createModernRoom() {
-        // Floor with grid for placement
-        const floorGeometry = new THREE.PlaneGeometry(50, 50);
-        const floorMaterial = new THREE.MeshStandardMaterial({
-            color: 0xf5f5f5,
-            roughness: 0.1,
+        // Create the ground plane
+        const groundGeometry = new THREE.PlaneGeometry(20, 20);
+        const groundMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            roughness: 0.7,
             metalness: 0.1
         });
-        this.groundPlane = new THREE.Mesh(floorGeometry, floorMaterial);
-        this.groundPlane.rotation.x = -Math.PI / 2;
-        this.groundPlane.receiveShadow = true;
-        this.groundPlane.userData.isGround = true;  // Important for raycasting
-        this.scene.add(this.groundPlane);
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = 0;
+        ground.receiveShadow = true;
+        ground.userData.isGround = true;
+        ground.userData.isRoom = true;
+        this.scene.add(ground);
 
-        // Add grid helper for placement
-        const size = 50;
-        const divisions = 50;
-        const gridHelper = new THREE.GridHelper(size, divisions, 0x888888, 0x888888);
-        gridHelper.position.y = 0.01; // Slightly above ground to prevent z-fighting
-        gridHelper.material.opacity = 0.1;
-        gridHelper.material.transparent = true;
-        this.scene.add(gridHelper);
-
-        // Store grid size for snapping calculations
-        this.gridSize = size / divisions;
-
-        // Back wall
-        const wallGeometry = new THREE.PlaneGeometry(50, 20);
+        // Create walls
         const wallMaterial = new THREE.MeshStandardMaterial({
             color: 0xffffff,
-            roughness: 0.2,
+            roughness: 0.7,
             metalness: 0.1
         });
-        const backWall = new THREE.Mesh(wallGeometry, wallMaterial);
-        backWall.position.z = -25;
-        backWall.position.y = 10;
+
+        // Back wall
+        const backWallGeometry = new THREE.PlaneGeometry(20, 10);
+        const backWall = new THREE.Mesh(backWallGeometry, wallMaterial);
+        backWall.position.z = -10;
+        backWall.position.y = 5;
         backWall.receiveShadow = true;
+        backWall.userData.isRoom = true;
         this.scene.add(backWall);
 
-        // Side wall
-        const sideWall = new THREE.Mesh(wallGeometry, wallMaterial);
-        sideWall.position.x = -25;
-        sideWall.position.y = 10;
-        sideWall.rotation.y = Math.PI / 2;
-        sideWall.receiveShadow = true;
-        this.scene.add(sideWall);
+        // Left wall
+        const leftWallGeometry = new THREE.PlaneGeometry(20, 10);
+        const leftWall = new THREE.Mesh(leftWallGeometry, wallMaterial);
+        leftWall.position.x = -10;
+        leftWall.position.y = 5;
+        leftWall.rotation.y = Math.PI / 2;
+        leftWall.receiveShadow = true;
+        leftWall.userData.isRoom = true;
+        this.scene.add(leftWall);
+
+        // Right wall
+        const rightWallGeometry = new THREE.PlaneGeometry(20, 10);
+        const rightWall = new THREE.Mesh(rightWallGeometry, wallMaterial);
+        rightWall.position.x = 10;
+        rightWall.position.y = 5;
+        rightWall.rotation.y = -Math.PI / 2;
+        rightWall.receiveShadow = true;
+        rightWall.userData.isRoom = true;
+        this.scene.add(rightWall);
+
+        // Add grid helper
+        const gridHelper = new THREE.GridHelper(20, 20);
+        gridHelper.userData.isRoom = true;
+        this.scene.add(gridHelper);
     }
 
     setupLights() {
@@ -118,6 +133,8 @@ export class SceneManager {
     setupCamera() {
         this.camera.position.set(12, 8, 12);
         this.camera.lookAt(0, 0, 0);
+        // Set camera reference in ObjectManager
+        this.objectManager.setCamera(this.camera);
     }
 
     setupControls() {
@@ -127,6 +144,63 @@ export class SceneManager {
         this.controls.minDistance = 1;
         this.controls.maxDistance = 20;
         this.controls.maxPolarAngle = Math.PI / 2;
+    }
+
+    onMouseClick(event) {
+        // Calculate mouse position in normalized device coordinates
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+
+        // Get all meshes in the scene that can be selected
+        const selectableMeshes = [];
+        this.scene.traverse((object) => {
+            if (object.isMesh && 
+                !object.userData.isGround && 
+                !object.userData.isOutline && 
+                !object.userData.isReflection &&
+                object.parent) {
+                // Only add meshes that are part of a GLB object
+                let parent = object.parent;
+                while (parent && !parent.userData.type) {
+                    parent = parent.parent;
+                }
+                if (parent && parent.userData.type === 'glb') {
+                    selectableMeshes.push(object);
+                }
+            }
+        });
+
+        const intersects = this.raycaster.intersectObjects(selectableMeshes, false);
+
+        // Remove any existing rotation text
+        const existingText = document.querySelector('.rotation-text');
+        if (existingText) {
+            existingText.remove();
+        }
+
+        if (intersects.length > 0) {
+            // Find the parent GLB object
+            let selectedObject = intersects[0].object;
+            while (selectedObject.parent && !selectedObject.parent.userData.type) {
+                selectedObject = selectedObject.parent;
+            }
+            
+            // Make sure we have the top-level GLB container
+            if (selectedObject.parent && selectedObject.parent.userData.type === 'glb') {
+                selectedObject = selectedObject.parent;
+            }
+
+            // If we found a valid object, select it
+            if (selectedObject.userData.type === 'glb') {
+                this.objectManager.selectObject(selectedObject);
+            }
+        } else {
+            // Click on empty space, clear selection
+            this.objectManager.clearSelection();
+        }
     }
 
     onWindowResize() {
@@ -150,22 +224,23 @@ export class SceneManager {
     }
 
     clearScene() {
-        // Remove all objects except ground, grid, and room elements
+        // Only remove non-room objects
         const objectsToRemove = [];
         this.scene.traverse((object) => {
-            // Skip ground plane, grid helper, lights, camera, and room elements
-            if (!object.userData.isGround && 
-                !(object instanceof THREE.GridHelper) && 
-                !(object instanceof THREE.Light) && 
-                !(object instanceof THREE.Camera) &&
-                !object.userData.isRoomElement) {  
+            if (object.isMesh && !object.userData.isRoom) {
                 objectsToRemove.push(object);
             }
         });
-        
+
+        // Remove the objects
         objectsToRemove.forEach(object => {
-            this.scene.remove(object);
+            object.removeFromParent();
         });
+
+        // Clear object manager's list
+        if (this.objectManager) {
+            this.objectManager.clearObjects();
+        }
     }
 
     getGroundIntersection(event) {
@@ -184,5 +259,16 @@ export class SceneManager {
             return point;
         }
         return null;
+    }
+
+    handleKeyPress(event) {
+        if (event.code === 'Space') {
+            event.preventDefault();
+            // Handle any other space key functionality if needed
+        }
+    }
+
+    setupEventListeners() {
+        window.addEventListener('keydown', this.handleKeyPress.bind(this));
     }
 }

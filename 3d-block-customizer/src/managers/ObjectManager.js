@@ -7,7 +7,17 @@ export class ObjectManager {
         this.gltfLoader = new GLTFLoader();
         this.previewMesh = null;
         this.selectedObject = null;
-        this.objectRotation = 0;
+        this.outlineMaterial = new THREE.LineBasicMaterial({
+            color: 0x000000,
+            linewidth: 2
+        });
+        this.selectionOutline = null;
+        this.actionButtonsContainer = null;
+        this.camera = null; // Will be set by SceneManager
+    }
+
+    setCamera(camera) {
+        this.camera = camera;
     }
 
     createObject(blockType, position) {
@@ -78,8 +88,8 @@ export class ObjectManager {
                 const model = gltf.scene;
                 
                 // Apply initial scale
-                model.scale.setScalar(blockType.scale || 1);
-                
+                const defaultScale = 6; // Increased from 1 to 2.5
+                model.scale.setScalar(blockType.scale ? blockType.scale * defaultScale : defaultScale);
                 // Update world matrix to ensure correct positions
                 model.updateWorldMatrix(true, true);
                 
@@ -185,48 +195,175 @@ export class ObjectManager {
     }
 
     selectObject(object) {
-        // Deselect previous object if any
-        if (this.selectedObject) {
-            this.deselectObject();
+        if (this.selectedObject === object) {
+            return; // Already selected
         }
 
-        // Select new object
-        this.selectedObject = object;
+        // Clear previous selection
+        this.clearSelection();
+
         if (object) {
-            console.log('Object selected:', object);
-            // Store current rotation
-            this.objectRotation = (Math.round(object.rotation.y * (180/Math.PI)) + 360) % 360;
-            // Add selection visual feedback
-            object.traverse((node) => {
-                if (node.isMesh && node.material) {
-                    node.material.emissive = new THREE.Color(0x555555);
-                }
-            });
+            this.selectedObject = object;
+            
+            // Create selection outline
+            const box = new THREE.Box3().setFromObject(object);
+            const center = new THREE.Vector3();
+            const size = new THREE.Vector3();
+            
+            box.getCenter(center);
+            box.getSize(size);
+            
+            // Create simple box outline
+            const outlineGeometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+            const edges = new THREE.EdgesGeometry(outlineGeometry);
+            const outline = new THREE.LineSegments(edges, this.outlineMaterial);
+            
+            // Position outline relative to object's center
+            outline.position.copy(center).sub(object.position);
+            outline.userData.isOutline = true;
+            
+            // Add outline to the object
+            object.add(outline);
+            this.selectionOutline = outline;
+
+            // Show action buttons
+            this.showActionButtons(object);
         }
     }
 
-    deselectObject() {
+    clearSelection() {
         if (this.selectedObject) {
-            console.log('Object deselected');
-            // Remove selection visual feedback
-            this.selectedObject.traverse((node) => {
-                if (node.isMesh && node.material) {
-                    node.material.emissive = new THREE.Color(0x000000);
-                }
-            });
+            // Remove outline
+            if (this.selectionOutline) {
+                this.selectionOutline.removeFromParent();
+                this.selectionOutline = null;
+            }
             this.selectedObject = null;
-            this.objectRotation = 0;
+            this.hideActionButtons();
         }
     }
 
-    rotateSelectedObject() {
-        if (this.selectedObject) {
-            console.log('Rotating selected object');
-            this.objectRotation = (this.objectRotation + 90) % 360;
-            this.selectedObject.rotation.y = THREE.MathUtils.degToRad(this.objectRotation);
-            return true;
+    showActionButtons(object) {
+        // Remove existing rotation text
+        const existingText = document.querySelector('.rotation-text');
+        if (existingText) {
+            existingText.remove();
         }
-        return false;
+
+        // Create action buttons container if it doesn't exist
+        if (!this.actionButtonsContainer) {
+            this.actionButtonsContainer = document.createElement('div');
+            this.actionButtonsContainer.style.position = 'absolute';
+            this.actionButtonsContainer.style.display = 'flex';
+            this.actionButtonsContainer.style.gap = '10px';
+            this.actionButtonsContainer.style.padding = '8px';
+            this.actionButtonsContainer.style.background = 'rgba(0, 0, 0, 0.7)';
+            this.actionButtonsContainer.style.borderRadius = '4px';
+            this.actionButtonsContainer.style.zIndex = '1000';
+
+            // Create buttons
+            const configureButton = this.createActionButton('Configure', () => this.configureObject(object));
+            const cloneButton = this.createActionButton('Clone', () => this.cloneObject(object));
+            const deleteButton = this.createActionButton('Delete', () => this.deleteObject(object));
+
+            this.actionButtonsContainer.appendChild(configureButton);
+            this.actionButtonsContainer.appendChild(cloneButton);
+            this.actionButtonsContainer.appendChild(deleteButton);
+
+            document.body.appendChild(this.actionButtonsContainer);
+        }
+
+        // Update position immediately and start animation loop
+        this.updateActionButtonsPosition();
+        if (!this.animationFrameId) {
+            const animate = () => {
+                this.updateActionButtonsPosition();
+                this.animationFrameId = requestAnimationFrame(animate);
+            };
+            animate();
+        }
+    }
+
+    createActionButton(text, onClick) {
+        const button = document.createElement('button');
+        button.textContent = text;
+        button.style.padding = '6px 12px';
+        button.style.border = 'none';
+        button.style.borderRadius = '4px';
+        button.style.backgroundColor = '#4a4a4a';
+        button.style.color = 'white';
+        button.style.cursor = 'pointer';
+        button.style.transition = 'background-color 0.2s';
+        
+        button.addEventListener('mouseover', () => {
+            button.style.backgroundColor = '#666666';
+        });
+        
+        button.addEventListener('mouseout', () => {
+            button.style.backgroundColor = '#4a4a4a';
+        });
+        
+        button.addEventListener('click', onClick);
+        return button;
+    }
+
+    hideActionButtons() {
+        if (this.actionButtonsContainer) {
+            this.actionButtonsContainer.remove();
+            this.actionButtonsContainer = null;
+        }
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+    }
+
+    updateActionButtonsPosition() {
+        if (this.selectedObject && this.actionButtonsContainer && this.camera) {
+            const box = new THREE.Box3().setFromObject(this.selectedObject);
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+            
+            // Add offset to position above the object
+            center.y = box.max.y + 0.5; // Add 0.5 units above the object
+            
+            // Convert 3D position to screen coordinates
+            const screenPosition = center.clone().project(this.camera);
+            const x = (screenPosition.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-screenPosition.y * 0.5 + 0.5) * window.innerHeight;
+            
+            // Update container position
+            this.actionButtonsContainer.style.left = `${x - this.actionButtonsContainer.offsetWidth / 2}px`;
+            this.actionButtonsContainer.style.top = `${y}px`;
+            
+            // Check if object is behind the camera
+            const isBehindCamera = screenPosition.z > 1;
+            this.actionButtonsContainer.style.display = isBehindCamera ? 'none' : 'flex';
+        }
+    }
+
+    configureObject(object) {
+        if (object) {
+            console.log('Configure object:', object);
+            // Implement configuration logic
+        }
+    }
+
+    cloneObject(object) {
+        if (object) {
+            console.log('Clone object:', object);
+            // Implement cloning logic
+        }
+    }
+
+    deleteObject(object) {
+        if (object) {
+            console.log('Delete object:', object);
+            // Clear selection first to remove outline and buttons
+            this.clearSelection();
+            // Then remove the object from scene
+            object.removeFromParent();
+        }
     }
 
     addObject(object) {
@@ -243,9 +380,21 @@ export class ObjectManager {
         }
     }
 
+    clearObjects() {
+        // Clear selection first
+        this.clearSelection();
+        
+        // Clear the objects array
+        this.objects = [];
+    }
+
     checkCollision(object1, object2) {
         const box1 = new THREE.Box3().setFromObject(object1);
         const box2 = new THREE.Box3().setFromObject(object2);
         return box1.intersectsBox(box2);
+    }
+
+    deselectObject() {
+        this.selectedObject = null;
     }
 }
