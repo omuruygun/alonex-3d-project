@@ -87,8 +87,6 @@ export class SceneManager {
             },
             undefined,
             (error) => {
-                console.error('Error loading room model:', error);
-                
                 // Fallback to create a basic ground plane if model fails to load
                 const groundGeometry = new THREE.PlaneGeometry(100, 100);
                 const groundMaterial = new THREE.MeshStandardMaterial({

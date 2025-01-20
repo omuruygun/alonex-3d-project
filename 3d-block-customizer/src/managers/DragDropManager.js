@@ -2,7 +2,6 @@ import * as THREE from 'three';
 
 export class DragDropManager {
     constructor(sceneManager, objectManager) {
-        console.log('DragDropManager initialized');
         this.sceneManager = sceneManager;
         this.objectManager = objectManager;
         this.raycaster = new THREE.Raycaster();
@@ -37,27 +36,21 @@ export class DragDropManager {
 
     rotateObject(object) {
         if (!object) {
-            console.log('No object to rotate');
             return;
         }
-        console.log('Rotating object');
         this.currentRotation = (this.currentRotation + 90) % 360;
         object.rotation.y = THREE.MathUtils.degToRad(this.currentRotation);
-        console.log('New rotation:', this.currentRotation);
     }
 
     handleDragStart(e, blockType) {
-        console.log('Drag started', blockType);
         e.dataTransfer.setData('blockType', blockType.name);
         e.dataTransfer.effectAllowed = 'move';
         this.currentDragBlockType = blockType;
         this.isDragging = true;
         this.currentRotation = 0;
-        console.log('Set isDragging to true');
         
         // Create preview immediately
         this.objectManager.createPreview(blockType).then(preview => {
-            console.log('Preview created:', preview, 'isDragging:', this.isDragging);
             if (preview) {
                 this.sceneManager.addObject(preview);
             }
@@ -153,7 +146,6 @@ export class DragDropManager {
     }
 
     handleDragLeave(e) {
-        console.log('Drag leave, was dragging:', this.isDragging);
         e.preventDefault();
         if (this.objectManager.previewMesh) {
             this.sceneManager.removeObject(this.objectManager.previewMesh);

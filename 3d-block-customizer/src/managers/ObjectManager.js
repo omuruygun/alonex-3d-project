@@ -344,77 +344,24 @@ export class ObjectManager {
 
     configureObject(object) {
         if (object) {
-            console.log('Configure object:', object);
-            // Implement configuration logic
+            object.userData.isConfigurable = true;
+            object.userData.isCloneable = true;
+            object.userData.isDeletable = true;
         }
     }
 
     cloneObject(object) {
         if (object) {
-            console.log('Clone object:', object);
-            // Implement cloning logic
+            const clone = object.clone();
+            this.configureObject(clone);
+            return clone;
         }
+        return null;
     }
 
     deleteObject(object) {
         if (object) {
-            console.log('Delete object:', object);
-            // Clear selection first to remove outline and buttons
-            this.clearSelection();
-            
-            // Remove the object from the objects array
-            const index = this.objects.indexOf(object);
-            if (index > -1) {
-                this.objects.splice(index, 1);
-            }
-            
-            // Clean up parent-child relationships
-            if (object.userData.parent) {
-                const parent = object.userData.parent;
-                if (parent.userData.children) {
-                    const childIndex = parent.userData.children.indexOf(object);
-                    if (childIndex > -1) {
-                        parent.userData.children.splice(childIndex, 1);
-                    }
-                }
-                delete object.userData.parent;
-            }
-            
-            // Clean up children
-            if (object.userData.children) {
-                object.userData.children.forEach(child => {
-                    if (child.userData.parent === object) {
-                        delete child.userData.parent;
-                    }
-                });
-                delete object.userData.children;
-            }
-            
-            // Remove from parent (scene)
-            if (object.parent) {
-                object.parent.remove(object);
-            }
-            
-            // Dispose of geometries and materials
-            object.traverse((child) => {
-                if (child.isMesh) {
-                    if (child.geometry) {
-                        child.geometry.dispose();
-                    }
-                    if (child.material) {
-                        if (Array.isArray(child.material)) {
-                            child.material.forEach(material => material.dispose());
-                        } else {
-                            child.material.dispose();
-                        }
-                    }
-                }
-            });
-            
-            // Force a scene update
-            if (object.parent) {
-                object.parent.updateMatrixWorld(true);
-            }
+            this.sceneManager.removeObject(object);
         }
     }
 

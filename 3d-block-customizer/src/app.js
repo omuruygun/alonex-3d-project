@@ -36,7 +36,6 @@ class BlockCustomizer {
         // Initialize scene and managers
         const container = document.getElementById('canvas-container');
         if (!container) {
-            console.error('Canvas container not found');
             return;
         }
 
