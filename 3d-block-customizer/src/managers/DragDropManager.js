@@ -74,10 +74,13 @@ export class DragDropManager {
 
         this.raycaster.setFromCamera(this.mouse, this.sceneManager.camera);
 
-        // Get all valid targets (ground and existing objects)
+        // Get all valid targets (ground and existing objects that are still in the scene)
         const validTargets = [
             ...this.sceneManager.scene.children.filter(obj => obj.userData.isGround),
-            ...this.objectManager.objects.filter(obj => obj !== this.objectManager.previewMesh)
+            ...this.objectManager.objects.filter(obj => 
+                obj !== this.objectManager.previewMesh && 
+                obj.parent === this.sceneManager.scene
+            )
         ];
 
         const intersects = this.raycaster.intersectObjects(validTargets, true);
@@ -94,7 +97,7 @@ export class DragDropManager {
             let finalPosition = intersectionPoint.clone();
 
             // If we intersected with an existing object (not ground)
-            if (intersectedObject.userData.type === 'glb') {
+            if (intersectedObject.userData.type === 'glb' && intersectedObject.parent === this.sceneManager.scene) {
                 const existingBBox = new THREE.Box3().setFromObject(intersectedObject);
                 const previewBBox = new THREE.Box3().setFromObject(this.objectManager.previewMesh);
                 

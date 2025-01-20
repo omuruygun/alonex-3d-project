@@ -220,7 +220,14 @@ export class SceneManager {
     }
 
     removeObject(object) {
-        this.scene.remove(object);
+        if (object) {
+            // Remove from scene
+            this.scene.remove(object);
+            // Also remove from ObjectManager
+            this.objectManager.removeObject(object);
+            // Force scene update
+            this.scene.updateMatrixWorld(true);
+        }
     }
 
     clearScene() {
