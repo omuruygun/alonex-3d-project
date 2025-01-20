@@ -106,6 +106,7 @@ class Sidebar {
                 border-radius: 8px;
                 overflow: hidden;
                 transition: transform 0.2s;
+                margin-bottom: 15px;
             `;
 
             const img = document.createElement('img');
@@ -132,6 +133,20 @@ class Sidebar {
                 this.hidePreview();
             });
         }
+
+        // Create filtered models container
+        const filteredContainer = document.createElement('div');
+        filteredContainer.id = 'filtered-models';
+        filteredContainer.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            margin-top: 20px;
+        `;
+        document.querySelector('.main-content').appendChild(filteredContainer);
     }
 
     showPreview(index, imageSrc) {
@@ -160,6 +175,42 @@ class Sidebar {
         this.selectedImage = imageId;
         const availableModels = this.modelGroups[imageId];
         
+        // Clear previous filtered models
+        const filteredContainer = document.getElementById('filtered-models');
+        filteredContainer.innerHTML = '';
+        
+        // Add model images to filtered container
+        availableModels.forEach(modelId => {
+            const modelWrapper = document.createElement('div');
+            modelWrapper.className = 'model-item';
+            modelWrapper.style.cssText = `
+                background: #f5f5f5;
+                padding: 10px;
+                border-radius: 8px;
+                cursor: move;
+            `;
+            
+            const modelImg = document.createElement('img');
+            modelImg.src = `src/images/models/${modelId}-screenshot.jpg`;
+            modelImg.alt = `Model ${modelId}`;
+            modelImg.style.cssText = `
+                width: 100%;
+                height: auto;
+                display: block;
+                border-radius: 4px;
+            `;
+            
+            modelWrapper.appendChild(modelImg);
+            
+            // Make the model draggable
+            modelWrapper.draggable = true;
+            modelWrapper.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', modelId);
+            });
+            
+            filteredContainer.appendChild(modelWrapper);
+        });
+
         // Dispatch custom event for model filtering
         const event = new CustomEvent('wardrobeSelected', {
             detail: {

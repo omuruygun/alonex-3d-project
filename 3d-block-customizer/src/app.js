@@ -81,6 +81,7 @@ class BlockCustomizer {
                 max-height: 80vh;
                 overflow-y: auto;
                 z-index: 1000;
+                width: 300px;
             `;
             document.body.appendChild(modelsContainer);
         }
@@ -88,50 +89,63 @@ class BlockCustomizer {
         // Clear existing content
         modelsContainer.innerHTML = '<h3 style="margin-bottom: 15px;">Available Models</h3>';
 
+        // Create grid container for models
+        const gridContainer = document.createElement('div');
+        gridContainer.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            padding: 10px;
+        `;
+        modelsContainer.appendChild(gridContainer);
+
         // Filter and display available models
         this.models.forEach((model, index) => {
             if (availableModels.includes((index + 1).toString())) {
-                const modelBtn = document.createElement('div');
-                modelBtn.textContent = model.name;
-                modelBtn.className = 'model-option';
-                modelBtn.draggable = true;
-                modelBtn.dataset.modelId = (index + 1).toString();
-                modelBtn.style.cssText = `
-                    display: block;
-                    width: 100%;
-                    padding: 10px;
-                    margin: 5px 0;
+                const modelWrapper = document.createElement('div');
+                modelWrapper.className = 'model-option';
+                modelWrapper.draggable = true;
+                modelWrapper.dataset.modelId = (index + 1).toString();
+                modelWrapper.style.cssText = `
                     background: #f5f5f5;
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
+                    padding: 10px;
+                    border-radius: 8px;
                     cursor: move;
-                    transition: all 0.2s;
-                    user-select: none;
+                    transition: transform 0.2s;
                 `;
 
-                // Add hover effects
-                modelBtn.addEventListener('mouseenter', () => {
-                    modelBtn.style.transform = 'translateX(5px)';
-                    modelBtn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
-                    modelBtn.style.borderColor = '#4CAF50';
+                const modelImg = document.createElement('img');
+                modelImg.src = `src/images/models/${index + 1}-screenshot.jpg`;
+                modelImg.alt = model.name;
+                modelImg.style.cssText = `
+                    width: 100%;
+                    height: auto;
+                    display: block;
+                    border-radius: 4px;
+                    pointer-events: none;
+                `;
+
+                modelWrapper.appendChild(modelImg);
+                gridContainer.appendChild(modelWrapper);
+
+                // Add hover effect
+                modelWrapper.addEventListener('mouseenter', () => {
+                    modelWrapper.style.transform = 'scale(1.05)';
+                });
+                modelWrapper.addEventListener('mouseleave', () => {
+                    modelWrapper.style.transform = 'scale(1)';
                 });
 
-                modelBtn.addEventListener('mouseleave', () => {
-                    modelBtn.style.transform = 'translateX(0)';
-                    modelBtn.style.boxShadow = 'none';
-                    modelBtn.style.borderColor = '#ddd';
-                });
-
-                // Add drag and drop functionality
-                modelBtn.addEventListener('dragstart', (e) => {
+                // Add drag start event listener
+                modelWrapper.addEventListener('dragstart', (e) => {
                     e.dataTransfer.effectAllowed = 'move';
-                    modelBtn.style.opacity = '0.5';
+                    modelWrapper.style.opacity = '0.5';
                     this.dragDropManager.handleDragStart(e, model);
                 });
 
-                modelBtn.addEventListener('dragend', (e) => {
+                modelWrapper.addEventListener('dragend', (e) => {
                     e.preventDefault();
-                    modelBtn.style.opacity = '1';
+                    modelWrapper.style.opacity = '1';
                     if (this.dragDropManager.isDragging) {
                         this.dragDropManager.isDragging = false;
                         if (this.dragDropManager.objectManager.previewMesh) {
@@ -140,8 +154,6 @@ class BlockCustomizer {
                         }
                     }
                 });
-
-                modelsContainer.appendChild(modelBtn);
             }
         });
     }
