@@ -209,4 +209,14 @@ export class DragDropManager {
         const gridSize = this.sceneManager.gridSize;
         return Math.round(value / gridSize) * gridSize;
     }
+
+    // Reset all state
+    reset() {
+        this.currentDragBlockType = null;
+        this.lastIntersectedObject = null;
+        this.currentRotation = 0;
+        this.isDragging = false;
+        this.mouse.set(0, 0);
+        this.intersectionPoint.set(0, 0, 0);
+    }
 }

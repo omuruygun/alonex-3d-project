@@ -25,7 +25,7 @@ export class ObjectManager {
             if (blockType.type === 'geometry') {
                 const mesh = this.createGeometryObject(blockType);
                 const height = this.getObjectHeight(mesh);
-                position.y += height / 2;
+                position.y = height / 2 + 0.01; // Add small offset to prevent z-fighting
                 mesh.position.copy(position);
                 resolve(mesh);
             } else if (blockType.isGLB) {
@@ -88,7 +88,7 @@ export class ObjectManager {
                 const model = gltf.scene;
                 
                 // Apply initial scale
-                const defaultScale = 6; // Increased from 1 to 2.5
+                const defaultScale = 3; // Increased from 1 to 2.5
                 model.scale.setScalar(blockType.scale ? blockType.scale * defaultScale : defaultScale);
                 // Update world matrix to ensure correct positions
                 model.updateWorldMatrix(true, true);

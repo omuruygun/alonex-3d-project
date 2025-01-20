@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ObjectManager } from './ObjectManager.js';
 
 export class SceneManager {
@@ -43,59 +44,70 @@ export class SceneManager {
         // Add fog for depth
         this.scene.fog = new THREE.Fog(0xffffff, 20, 40);
 
-        // Create the ground plane
-        const groundGeometry = new THREE.PlaneGeometry(20, 20);
-        const groundMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            roughness: 0.7,
-            metalness: 0.1
+        // Create a large invisible ground plane for interaction
+        const interactiveGroundGeometry = new THREE.PlaneGeometry(100, 100);
+        const interactiveGroundMaterial = new THREE.MeshBasicMaterial({ 
+            visible: false,
+            side: THREE.DoubleSide
         });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = -Math.PI / 2;
-        ground.position.y = 0;
-        ground.receiveShadow = true;
-        ground.userData.isGround = true;
-        ground.userData.isRoom = true;
-        this.scene.add(ground);
+        const interactiveGround = new THREE.Mesh(interactiveGroundGeometry, interactiveGroundMaterial);
+        interactiveGround.rotation.x = -Math.PI / 2;
+        interactiveGround.position.y = 0; // Set to exactly 0 to match the room floor
+        interactiveGround.userData.isGround = true;
+        interactiveGround.userData.isInteractiveGround = true; // Add this flag to distinguish it
+        this.scene.add(interactiveGround);
 
-        // Create walls
-        const wallMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            roughness: 0.7,
-            metalness: 0.1
-        });
+        // Load the room model
+        const loader = new GLTFLoader();
+        loader.load(
+            '/models/room.glb',
+            (gltf) => {
+                const room = gltf.scene;
+                room.traverse((child) => {
+                    if (child.isMesh) {
+                        child.receiveShadow = true;
+                        child.castShadow = true;
+                        child.userData.isRoom = true;
+                        
+                        // Make floor meshes receive shadows but not interactive
+                        const normalY = Math.abs(child.geometry.attributes.normal.array[1]);
+                        const isNearGround = Math.abs(child.position.y) < 0.1;
+                        
+                        if (normalY > 0.9 && isNearGround) {
+                            child.receiveShadow = true;
+                            child.position.y = -0.01; // Slightly lower the visible floor
+                        }
+                    }
+                });
+                
+                // Scale and position the room as needed
+                room.scale.set(1, 1, 1);
+                room.position.set(0, 0, 0);
+                this.scene.add(room);
+            },
+            undefined,
+            (error) => {
+                console.error('Error loading room model:', error);
+                
+                // Fallback to create a basic ground plane if model fails to load
+                const groundGeometry = new THREE.PlaneGeometry(100, 100);
+                const groundMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    roughness: 0.7,
+                    metalness: 0.1
+                });
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.position.y = -0.01; // Slightly lower the visible floor
+                ground.receiveShadow = true;
+                ground.userData.isGround = true;
+                ground.userData.isVisibleGround = true; // Add this flag to distinguish it
+                this.scene.add(ground);
+            }
+        );
 
-        // Back wall
-        const backWallGeometry = new THREE.PlaneGeometry(20, 10);
-        const backWall = new THREE.Mesh(backWallGeometry, wallMaterial);
-        backWall.position.z = -10;
-        backWall.position.y = 5;
-        backWall.receiveShadow = true;
-        backWall.userData.isRoom = true;
-        this.scene.add(backWall);
-
-        // Left wall
-        const leftWallGeometry = new THREE.PlaneGeometry(20, 10);
-        const leftWall = new THREE.Mesh(leftWallGeometry, wallMaterial);
-        leftWall.position.x = -10;
-        leftWall.position.y = 5;
-        leftWall.rotation.y = Math.PI / 2;
-        leftWall.receiveShadow = true;
-        leftWall.userData.isRoom = true;
-        this.scene.add(leftWall);
-
-        // Right wall
-        const rightWallGeometry = new THREE.PlaneGeometry(20, 10);
-        const rightWall = new THREE.Mesh(rightWallGeometry, wallMaterial);
-        rightWall.position.x = 10;
-        rightWall.position.y = 5;
-        rightWall.rotation.y = -Math.PI / 2;
-        rightWall.receiveShadow = true;
-        rightWall.userData.isRoom = true;
-        this.scene.add(rightWall);
-
-        // Add grid helper
-        const gridHelper = new THREE.GridHelper(20, 20);
+        // Add grid helper (make it larger to match the ground plane)
+        const gridHelper = new THREE.GridHelper(100, 100);
         gridHelper.userData.isRoom = true;
         this.scene.add(gridHelper);
     }
@@ -231,10 +243,10 @@ export class SceneManager {
     }
 
     clearScene() {
-        // Only remove non-room objects
+        // Only remove non-room and non-ground objects
         const objectsToRemove = [];
         this.scene.traverse((object) => {
-            if (object.isMesh && !object.userData.isRoom) {
+            if (object.isMesh && !object.userData.isRoom && !object.userData.isGround) {
                 objectsToRemove.push(object);
             }
         });
@@ -247,6 +259,37 @@ export class SceneManager {
         // Clear object manager's list
         if (this.objectManager) {
             this.objectManager.clearObjects();
+        }
+
+        // Reset drag drop manager state
+        if (this.dragDropManager) {
+            this.dragDropManager.reset();
+        }
+
+        // Ensure the interactive ground plane is still present and properly positioned
+        let hasInteractiveGround = false;
+        this.scene.traverse((object) => {
+            if (object.userData.isInteractiveGround) {
+                hasInteractiveGround = true;
+                // Ensure proper position and rotation
+                object.position.y = 0;
+                object.rotation.x = -Math.PI / 2;
+            }
+        });
+
+        // If no interactive ground exists, create a new one
+        if (!hasInteractiveGround) {
+            const interactiveGroundGeometry = new THREE.PlaneGeometry(100, 100);
+            const interactiveGroundMaterial = new THREE.MeshBasicMaterial({ 
+                visible: false,
+                side: THREE.DoubleSide
+            });
+            const interactiveGround = new THREE.Mesh(interactiveGroundGeometry, interactiveGroundMaterial);
+            interactiveGround.rotation.x = -Math.PI / 2;
+            interactiveGround.position.y = 0;
+            interactiveGround.userData.isGround = true;
+            interactiveGround.userData.isInteractiveGround = true;
+            this.scene.add(interactiveGround);
         }
     }
 
